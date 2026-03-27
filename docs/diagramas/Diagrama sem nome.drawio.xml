@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36" version="29.6.6">
+  <diagram name="Página-1" id="SyrZafKm5cAONa-yyBvY">
+    <mxGraphModel dx="1678" dy="924" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-1" parent="1" style="swimlane;whiteSpace=wrap;html=1;dashed=1;fontColor=#666666;strokeColor=#666666;fillColor=none;collapsible=0;" value=" " vertex="1">
+          <mxGeometry height="820" width="1150" x="640" y="440" as="geometry" />
+        </mxCell>
+        <object placeholders="1" c4Name="Redis" c4Type="Container" c4Technology="In Memory" c4Description="Status Online, Sessões e Rate Limit." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-2">
+          <mxCell parent="VDwV4ypYIji9rrAOZ2V7-1" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;rounded=0;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1">
+            <mxGeometry height="120" width="240" x="370" y="240" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Kafka Event Stream" c4Type="Container" c4Technology="Kafka" c4Description="Broker de eventos para desacoplamento." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-3">
+          <mxCell parent="VDwV4ypYIji9rrAOZ2V7-1" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;rounded=0;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1">
+            <mxGeometry height="120" width="240" x="680" y="240" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="API Service" c4Type="Container" c4Technology="Go" c4Description="Gera identidades, salas e moderação via HTTP." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-4">
+          <mxCell parent="VDwV4ypYIji9rrAOZ2V7-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
+            <mxGeometry height="120" width="240" x="130" y="30" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Postgres Database" c4Type="Container" c4Technology="PostgreSQL" c4Description="Dados de usuários, salas e mensagens." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-5">
+          <mxCell parent="VDwV4ypYIji9rrAOZ2V7-1" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;rounded=0;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1">
+            <mxGeometry height="120" width="240" x="70" y="240" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-6" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-4" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-7" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Lê e escreve dados de usuários e salas [SQL]" vertex="1">
+          <mxGeometry relative="1" x="-0.0646" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <object placeholders="1" c4Name="Persistence Worker" c4Type="Container" c4Technology="Go" c4Description="&#xa;Salva histórico no banco (se não for Zero Logging)." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-8">
+          <mxCell parent="VDwV4ypYIji9rrAOZ2V7-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
+            <mxGeometry height="120" width="240" x="70" y="470" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-9" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-8" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-10" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-9" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Persiste histórico de mensagens [SQL]" vertex="1">
+          <mxGeometry relative="1" x="0.0909" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <object placeholders="1" c4Name="WebSocket Gateway" c4Type="Container" c4Technology="Go" c4Description="Mantém conexões WSS e gerencia presença." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-11">
+          <mxCell parent="VDwV4ypYIji9rrAOZ2V7-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
+            <mxGeometry height="120" width="240" x="510" y="30" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Message Fanout Worker" c4Type="Container" c4Technology="Go" c4Description="Envia mensagens em tempo real aos destinatários." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-12">
+          <mxCell parent="VDwV4ypYIji9rrAOZ2V7-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
+            <mxGeometry height="120" width="240" x="880" y="470" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="TTL Worker" c4Type="Container" c4Technology="Go" c4Description="Executa remoção de mensagens e salas expiradas." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-13">
+          <mxCell parent="VDwV4ypYIji9rrAOZ2V7-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
+            <mxGeometry height="120" width="240" x="340" y="470" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Moderation Worker" c4Type="Container" c4Technology="Go" c4Description="Processa bans e denúncias assincronamente." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-14">
+          <mxCell parent="VDwV4ypYIji9rrAOZ2V7-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
+            <mxGeometry height="120" width="240" x="610" y="470" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-15" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-11" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-16" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-15" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Consulta sessões,&amp;nbsp;&lt;div&gt;&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212)); color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;atualiza presença e&amp;nbsp;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;registra onde o usuário está&amp;nbsp;&lt;/div&gt;&lt;div&gt;conectado&lt;br&gt;&lt;div&gt;&amp;nbsp;[Redis Protocol]&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.2466" y="3" as="geometry">
+            <mxPoint x="7" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-17" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-11" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-18" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-17" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Publica eventos de&amp;nbsp;&lt;div&gt;mensagens [Kafka Protocol]&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.2682" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-19" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-3" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-20" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-19" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Consome eventos para processamento&amp;nbsp;&lt;div&gt;[Kafka Protocol]&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.2405" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-21" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-3" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-22" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-21" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Consome eventos para&amp;nbsp;&lt;div&gt;processamento&lt;div&gt;&amp;nbsp;[Kafka Protocol]&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.0653" y="-4" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-23" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-3" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.795;entryY=-0.005;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-24" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-23" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Consome eventos para&amp;nbsp;&lt;div&gt;processamento&amp;nbsp;&lt;div&gt;[Kafka Protocol]&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0233" y="-3" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-25" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-3" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-26" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-25" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Consome eventos para&amp;nbsp;&lt;div&gt;processamento&amp;nbsp;&lt;/div&gt;&lt;div&gt;[Kafka Protocol]&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.2161" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-27" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-28" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-27" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Envia mensagens para&amp;nbsp;&lt;div&gt;entrega aos clientes&lt;div&gt;&amp;nbsp;[gRPC/Internal] no&lt;/div&gt;&lt;/div&gt;&lt;div&gt;gateway onde o usuário está&amp;nbsp;&lt;/div&gt;&lt;div&gt;conectado&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.2738" y="4" as="geometry">
+            <mxPoint y="-34" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-29" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-4" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.46;entryY=0.016;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-30" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-29" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Cria e valida sessões&amp;nbsp;&lt;div&gt;[Redis Protocol]&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.3593" y="1" as="geometry">
+            <mxPoint y="22" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-31" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-32" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-31" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Remove registros e mensagens expiradas [SQL]" vertex="1">
+          <mxGeometry relative="1" x="-0.4257" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-33" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="670" y="630" />
+              <mxPoint x="40" y="630" />
+              <mxPoint x="40" y="270" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-34" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-33" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Grava ações de moderação e auditoria [SQL]" vertex="1">
+          <mxGeometry relative="1" x="-0.2164" y="-2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-43" edge="1" parent="VDwV4ypYIji9rrAOZ2V7-1" source="VDwV4ypYIji9rrAOZ2V7-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-44" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-43" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Consulta de&lt;div&gt;localização&lt;/div&gt;&lt;div&gt;de conexão usuário&lt;/div&gt;&lt;div&gt;[Redis Pub/Sub]&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.065" y="4" as="geometry">
+            <mxPoint x="34" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <object placeholders="1" c4Name="Media Storage" c4Type="External System: MinIO" c4Description="Componente externo que gerencia o MinIO para guardar anexos" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-35">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
+            <mxGeometry height="120" width="240" x="340" y="470" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-36" edge="1" parent="1" source="VDwV4ypYIji9rrAOZ2V7-4" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;exitPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-35">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="670" y="545" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-37" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-36" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Upload de anexos&amp;nbsp;&lt;div&gt;[S3 API/HTTPS]&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0111" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <object placeholders="1" c4Name="Web Client" c4Type="Container" c4Technology="React" c4Description="Cliente Web onde os usuários acessam o sistema." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="VDwV4ypYIji9rrAOZ2V7-38">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
+            <mxGeometry height="120" width="240" x="930" y="270" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-39" edge="1" parent="1" source="VDwV4ypYIji9rrAOZ2V7-38" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-40" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-39" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Autenticação e gestão de salas [JSON/HTTPS]" vertex="1">
+          <mxGeometry relative="1" x="-0.3541" y="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-41" edge="1" parent="1" source="VDwV4ypYIji9rrAOZ2V7-38" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="VDwV4ypYIji9rrAOZ2V7-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VDwV4ypYIji9rrAOZ2V7-42" connectable="0" parent="VDwV4ypYIji9rrAOZ2V7-41" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Troca de mensagens e presença [WSS]" vertex="1">
+          <mxGeometry relative="1" x="-0.2923" y="2" as="geometry">
+            <mxPoint x="43" as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
