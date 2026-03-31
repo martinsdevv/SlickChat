@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36" version="29.6.6">
+  <diagram name="Página-1" id="JbWOpTicYX5mLFmrcblR">
+    <mxGraphModel dx="1870" dy="1893" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-121" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Remetente" vertex="1">
+          <mxGeometry height="1240" width="150" x="20" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-122" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Realtime Gateway" vertex="1">
+          <mxGeometry height="1240" width="156" x="264" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-123" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Redis" vertex="1">
+          <mxGeometry height="1240" width="150" x="529" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-124" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Kafka" vertex="1">
+          <mxGeometry height="1240" width="150" x="729" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-125" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Fanout Worker" vertex="1">
+          <mxGeometry height="1240" width="150" x="1014" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-126" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Destinatário" vertex="1">
+          <mxGeometry height="1240" width="150" x="1214" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-127" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-121" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-122" value="Enviar mensagem">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="227" y="129" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-128" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-122" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-123" value="Validar sessão e rate limit">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="482" y="183" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-129" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-122" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-124" value="Publicar MessageSent">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="582" y="237" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-130" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-122" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;dashed=1;dashPattern=2 3;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-121" value="ACK (mensagem aceita)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="230" y="291" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-131" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-124" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-125" value="Consumir MessageSent">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="955" y="345" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-132" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-125" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-123" value="Publicar no Pub/Sub">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="858" y="399" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-133" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-123" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-122" value="Entregar para gateways">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="485" y="453" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-134" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-122" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-126" value="Nova mensagem">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="824" y="507" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-135" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-126" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-122" value="Mensagem recebida (delivery ack)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="827" y="561" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-136" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-122" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-124" value="Publicar MessageDelivered">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="582" y="615" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-137" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-124" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-125" value="Consumir MessageDelivered">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="955" y="669" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-138" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-125" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-123" value="Publicar atualização">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="858" y="723" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-139" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-123" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-122" value="Notificar gateways">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="485" y="777" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-140" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-122" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-121" value="Status = entregue">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="230" y="831" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-141" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-126" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-122" value="Mensagem lida">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="827" y="885" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-142" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-122" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-124" value="Publicar MessageRead">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="582" y="939" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-143" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-124" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-125" value="Consumir MessageRead">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="955" y="993" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-144" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-125" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-123" value="Publicar atualização">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="858" y="1047" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-145" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-123" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-122" value="Notificar gateways">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="485" y="1101" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-146" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-122" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-121" value="Status = lida">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="230" y="1155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

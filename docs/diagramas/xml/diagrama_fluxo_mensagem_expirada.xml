@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36" version="29.6.6">
+  <diagram name="Página-1" id="JbWOpTicYX5mLFmrcblR">
+    <mxGraphModel dx="1691" dy="1130" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-173" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="TTL Worker" vertex="1">
+          <mxGeometry height="752" width="150" x="20" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-174" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Kafka" vertex="1">
+          <mxGeometry height="752" width="150" x="278" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-175" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Fanout Worker" vertex="1">
+          <mxGeometry height="752" width="150" x="548" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-176" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Redis" vertex="1">
+          <mxGeometry height="752" width="150" x="749" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-177" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Gateway" vertex="1">
+          <mxGeometry height="752" width="150" x="958" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-178" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Usuários" vertex="1">
+          <mxGeometry height="752" width="150" x="1228" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-179" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=65;fillColor=light-dark(#eeeeee,#1f2020);strokeColor=light-dark(#999999,#cccccc);fontColor=light-dark(#333333,#cccccc);" value="Banco" vertex="1">
+          <mxGeometry height="752" width="150" x="1428" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-180" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-173" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-179" value="Buscar mensagens expiradas">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="808" y="129" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-181" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-173" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-174" value="Publicar MessageExpired">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="233" y="183" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-182" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-177" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-174" value="Publicar MessageRead">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="705" y="289" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-183" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-174" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-173" value="Consumir MessageRead">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="236" y="343" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-184" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-173" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-174" value="Publicar MessageExpired">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="233" y="397" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-185" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-174" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-175" value="Consumir MessageExpired">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="497" y="451" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-186" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-175" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-176" value="Publicar remoção">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="732" y="505" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-187" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-176" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-177" value="Notificar gateways">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="937" y="559" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-188" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-177" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-178" value="Remover mensagem da UI">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1177" y="613" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-189" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-173" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-179" value="Deletar mensagem">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="808" y="667" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-190" parent="1" style="fillColor=#ffff88;strokeColor=#9E916F;fontColor=light-dark(#333333,#cccccc);" value="Evento vem do cliente" vertex="1">
+          <mxGeometry height="52" width="185" x="941" y="203" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
