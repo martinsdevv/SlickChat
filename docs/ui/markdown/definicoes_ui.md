@@ -474,17 +474,19 @@ A escolha da tipografia visa clareza, legibilidade e um toque moderno.
 
 ## 18.3 Paleta de Cores
 
-A paleta de cores primária será baseada em um tema escuro para reforçar a ideia de privacidade e foco, com cores de destaque para ações e estados.
+A paleta de cores primária será baseada em um tema escuro para reforçar a ideia de privacidade e foco, com a adição de roxo como cor de destaque e complementares.
 
 *   **Tema Padrão:** Escuro (dark mode) por padrão.
-    *   **Fundo:** Tons de cinza escuro ou preto (`#121212`, `#1e1e1e`).
-    *   **Texto Principal:** Branco ou cinza claro (`#ffffff`, `#e0e0e0`).
-    *   **Texto Secundário:** Tons de cinza para informações menos importantes (`#aaaaaa`, `#888888`).
-*   **Cores de Destaque:** Cores vibrantes, mas suaves, para elementos interativos e indicadores de status.
-    *   **Primária (Ações):** Azul ou Verde-água (ex: `#23A2D9` - inspirado na cor dos containers C4) para botões, links, ícones ativos.
+    *   **Fundo:** Preto (`#0A0A0A`) ou tons de cinza escuro (`#1A1A1A`, `#2D2D2D`).
+    *   **Texto Principal:** Branco (`#FFFFFF`) ou cinza muito claro (`#F0F0F0`).
+    *   **Texto Secundário:** Tons de cinza médio para informações menos importantes (`#A0A0A0`, `#7F7F7F`).
+*   **Cores de Destaque:** Dois níveis de roxo para ações e estados, complementados por cores para feedback.
+    *   **Roxo Primário (Ação Forte):** Um roxo profundo e vibrante (ex: `#7A00FF` ou `#6A0DAD`) para botões principais, ações críticas e elementos de forte destaque.
+    *   **Roxo Suave (Ativo/Hover):** Um tom mais claro e suave de roxo (ex: `#A052FF` ou `#B388FF`) para estados de hover, elementos selecionados, backgrounds de itens ativos e highlights.
     *   **Sucesso:** Verde (`#4CAF50`).
     *   **Aviso:** Amarelo (`#FFC107`).
     *   **Erro:** Vermelho (`#F44336`).
+    *   **Cores Complementares (Sutil):** Tons de azul escuro ou ciano suave podem ser usados para gráficos ou elementos de fundo secundários, se necessário, para complementar o roxo.
 
 ## 18.4 Ícones
 
