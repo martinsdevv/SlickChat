@@ -4,16 +4,16 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/martinsdevv/slickchat/services/gateway/internal/redis"
+	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
+	redisinfra "github.com/martinsdevv/slickchat/infrastructure/redis"
 	"github.com/martinsdevv/slickchat/services/gateway/internal/ws"
 )
 
 func main() {
-	rdb := redis.NewClient()
+	rdb := redisinfra.NewClient()
+	producer := kafkainfra.NewProducer("localhost:9092")
 
-	go ws.StartSubscriber(rdb)
-
-	http.HandleFunc("/socket", ws.HandleWS(rdb))
+	http.HandleFunc("/socket", ws.HandleWS(rdb, producer))
 
 	log.Println("Gateway rodando em :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

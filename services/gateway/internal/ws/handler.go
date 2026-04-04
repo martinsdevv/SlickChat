@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -40,7 +42,7 @@ type OutMessage struct {
 	Payload interface{} `json:"payload"`
 }
 
-func HandleWS(rdb *redis.Client) http.HandlerFunc {
+func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -63,6 +65,8 @@ func HandleWS(rdb *redis.Client) http.HandlerFunc {
 		mu.Lock()
 		clients[connectionID] = client
 		mu.Unlock()
+
+		go subscribeConnection(rdb, connectionID)
 
 		rdb.SAdd(r.Context(), "user_connections:"+userID, connectionID)
 
@@ -97,11 +101,30 @@ func HandleWS(rdb *redis.Client) http.HandlerFunc {
 				var payload SendMessagePayload
 				json.Unmarshal(msg.Payload, &payload)
 
-				handleSendMessage(rdb, payload)
+				if !isUserInRoom(rdb, userID, payload.RoomID) {
+					sendError(client, "not_in_room")
+					continue
+				}
 
+				handleSendMessage(producer, payload)
 				sendAck(client)
 			}
 		}
+	}
+}
+
+func subscribeConnection(rdb *redis.Client, connectionID string) {
+	ctx := context.Background()
+
+	pubsub := rdb.Subscribe(ctx, "connection:"+connectionID)
+
+	ch := pubsub.Channel()
+
+	for msg := range ch {
+		var event MessageSent
+		json.Unmarshal([]byte(msg.Payload), &event)
+
+		sendToConnection(connectionID, event)
 	}
 }
 
@@ -110,4 +133,24 @@ func (c *Client) Write(v interface{}) error {
 	defer c.Mu.Unlock()
 
 	return c.Conn.WriteJSON(v)
+}
+
+func isUserInRoom(rdb *redis.Client, userID, roomID string) bool {
+	ctx := context.Background()
+
+	exists, err := rdb.SIsMember(ctx, "room_members:"+roomID, userID).Result()
+	if err != nil {
+		return false
+	}
+
+	return exists
+}
+
+func sendError(client *Client, code string) {
+	client.Write(map[string]interface{}{
+		"type": "error",
+		"payload": map[string]string{
+			"code": code,
+		},
+	})
 }

@@ -1,12 +1,11 @@
 package ws
 
 import (
-	"encoding/json"
+	"context"
 	"time"
 
 	"github.com/google/uuid"
-	redisclient "github.com/martinsdevv/slickchat/services/gateway/internal/redis"
-	"github.com/redis/go-redis/v9"
+	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 )
 
 type MessageSent struct {
@@ -17,7 +16,7 @@ type MessageSent struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func handleSendMessage(rdb *redis.Client, payload SendMessagePayload) {
+func handleSendMessage(producer *kafkainfra.Producer, payload SendMessagePayload) {
 	event := MessageSent{
 		MessageID: uuid.New().String(),
 		RoomID:    payload.RoomID,
@@ -26,9 +25,7 @@ func handleSendMessage(rdb *redis.Client, payload SendMessagePayload) {
 		Timestamp: time.Now(),
 	}
 
-	data, _ := json.Marshal(event)
-
-	rdb.Publish(redisclient.Ctx, "room:"+payload.RoomID, data)
+	producer.Publish(context.Background(), event)
 }
 
 func sendAck(client *Client) {

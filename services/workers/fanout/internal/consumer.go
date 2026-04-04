@@ -4,17 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"time"
 
 	"github.com/segmentio/kafka-go"
 )
 
 type MessageSent struct {
-	MessageID string    `json:"message_id"`
-	RoomID    string    `json:"room_id"`
-	SenderID  string    `json:"sender_id"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
+	MessageID string `json:"message_id"`
+	RoomID    string `json:"room_id"`
+	SenderID  string `json:"sender_id"`
+	Content   string `json:"content"`
+	Timestamp string `json:"timestamp"`
 }
 
 func StartConsumer(broker string, handler func(MessageSent)) {
