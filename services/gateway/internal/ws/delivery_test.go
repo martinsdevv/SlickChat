@@ -2,10 +2,6 @@ package ws
 
 import (
 	"testing"
-
-	"github.com/martinsdevv/slickchat/core/events"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 type MockClient struct {

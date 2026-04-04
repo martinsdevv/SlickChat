@@ -2,15 +2,11 @@ package ws
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 )
 
 type MockRedis struct {
