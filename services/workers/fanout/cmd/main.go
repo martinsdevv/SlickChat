@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/martinsdevv/slickchat/core/events"
 	fanout "github.com/martinsdevv/slickchat/services/workers/fanout/internal"
 	"github.com/redis/go-redis/v9"
 )
@@ -17,19 +18,29 @@ func main() {
 	})
 
 	fmt.Println("Fanout worker rodando")
-	fanout.StartConsumer("localhost:9092", func(event fanout.MessageSent) {
-		handleFanout(ctx, rdb, event)
+
+	fanout.StartConsumer("localhost:9092", func(event events.Event) {
+
+		switch event.Type {
+
+		case events.EventTypeMessageSent:
+			var payload events.MessageSent
+			json.Unmarshal(event.Payload, &payload)
+
+			handleFanout(ctx, rdb, payload)
+		}
 	})
 }
 
-func handleFanout(ctx context.Context, rdb *redis.Client, event fanout.MessageSent) {
-	userIDs, _ := rdb.SMembers(ctx, "room_members:"+event.RoomID).Result()
-
-	data, _ := json.Marshal(event)
+func handleFanout(ctx context.Context, rdb *redis.Client, event events.MessageSent) {
 
 	if !isUserInRoom(rdb, event.SenderID, event.RoomID) {
 		return
 	}
+
+	userIDs, _ := rdb.SMembers(ctx, "room_members:"+event.RoomID).Result()
+
+	data, _ := json.Marshal(event)
 
 	for _, userID := range userIDs {
 		connIDs, _ := rdb.SMembers(ctx, "user_connections:"+userID).Result()
@@ -39,7 +50,6 @@ func handleFanout(ctx context.Context, rdb *redis.Client, event fanout.MessageSe
 		}
 	}
 }
-
 func isUserInRoom(rdb *redis.Client, userID, roomID string) bool {
 	ctx := context.Background()
 

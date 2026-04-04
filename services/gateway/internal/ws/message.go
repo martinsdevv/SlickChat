@@ -2,27 +2,29 @@ package ws
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/martinsdevv/slickchat/core/events"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 )
 
-type MessageSent struct {
-	MessageID string    `json:"message_id"`
-	RoomID    string    `json:"room_id"`
-	SenderID  string    `json:"sender_id"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-func handleSendMessage(producer *kafkainfra.Producer, payload SendMessagePayload) {
-	event := MessageSent{
+func handleSendMessage(producer *kafkainfra.Producer, payload SendMessagePayload, userId string) {
+	payloadRaw := events.MessageSent{
 		MessageID: uuid.New().String(),
 		RoomID:    payload.RoomID,
-		SenderID:  "1",
+		SenderID:  userId,
 		Content:   payload.Content,
+	}
+
+	payloadBytes, _ := json.Marshal(payloadRaw)
+
+	event := events.Event{
+		ID:        uuid.New().String(),
+		Type:      events.EventTypeMessageSent,
 		Timestamp: time.Now(),
+		Payload:   payloadBytes,
 	}
 
 	producer.Publish(context.Background(), event)

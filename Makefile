@@ -1,3 +1,12 @@
+infra-up:
+	docker compose -f ./deploy/compose.yml up -d
+
+infra-down:
+	docker compose -f ./deploy/compose.yml down
+
+infra-logs:
+	docker compose -f ./deploy/compose.yml logs -f
+
 run-api:
 	go run ./services/api/cmd
 

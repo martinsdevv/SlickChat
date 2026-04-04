@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/martinsdevv/slickchat/core/events"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/redis/go-redis/v9"
 )
@@ -106,7 +107,7 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 					continue
 				}
 
-				handleSendMessage(producer, payload)
+				handleSendMessage(producer, payload, userID)
 				sendAck(client)
 			}
 		}
@@ -121,7 +122,7 @@ func subscribeConnection(rdb *redis.Client, connectionID string) {
 	ch := pubsub.Channel()
 
 	for msg := range ch {
-		var event MessageSent
+		var event events.MessageSent
 		json.Unmarshal([]byte(msg.Payload), &event)
 
 		sendToConnection(connectionID, event)

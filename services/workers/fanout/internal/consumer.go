@@ -5,18 +5,11 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/martinsdevv/slickchat/core/events"
 	"github.com/segmentio/kafka-go"
 )
 
-type MessageSent struct {
-	MessageID string `json:"message_id"`
-	RoomID    string `json:"room_id"`
-	SenderID  string `json:"sender_id"`
-	Content   string `json:"content"`
-	Timestamp string `json:"timestamp"`
-}
-
-func StartConsumer(broker string, handler func(MessageSent)) {
+func StartConsumer(broker string, handler func(events.Event)) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{broker},
 		Topic:   "message-events",
@@ -30,7 +23,7 @@ func StartConsumer(broker string, handler func(MessageSent)) {
 			continue
 		}
 
-		var event MessageSent
+		var event events.Event
 		json.Unmarshal(msg.Value, &event)
 
 		handler(event)
