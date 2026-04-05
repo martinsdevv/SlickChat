@@ -3,14 +3,15 @@ package ws
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/martinsdevv/slickchat/core/application"
 	"github.com/martinsdevv/slickchat/core/events"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
+	"github.com/martinsdevv/slickchat/infrastructure/log"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -47,7 +48,7 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Println("erro no upgrade:", err)
+			log.Logger.Info("erro no upgrade:", err)
 			return
 		}
 
@@ -76,7 +77,9 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 			"gateway_id": gatewayID,
 		})
 
-		log.Println("Nova conexão:", connectionID)
+		log.Logger.Info("connection_opened",
+			"connection_id", connectionID,
+		)
 
 		defer func() {
 
@@ -107,7 +110,7 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 					continue
 				}
 
-				handleSendMessage(producer, payload, userID)
+				application.SendMessage(producer, userID, payload.RoomID, payload.Content)
 				sendAck(client)
 			}
 		}
@@ -122,6 +125,7 @@ func subscribeConnection(rdb *redis.Client, connectionID string) {
 	ch := pubsub.Channel()
 
 	for msg := range ch {
+
 		var event events.MessageSent
 		json.Unmarshal([]byte(msg.Payload), &event)
 

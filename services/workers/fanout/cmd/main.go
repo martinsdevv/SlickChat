@@ -3,21 +3,21 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/martinsdevv/slickchat/core/events"
+	"github.com/martinsdevv/slickchat/infrastructure/log"
+	redisinfra "github.com/martinsdevv/slickchat/infrastructure/redis"
 	fanout "github.com/martinsdevv/slickchat/services/workers/fanout/internal"
 	"github.com/redis/go-redis/v9"
 )
 
 func main() {
 	ctx := context.Background()
+	log.Init()
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
+	rdb := redisinfra.NewClient()
 
-	fmt.Println("Fanout worker rodando")
+	log.Logger.Info("Fanout worker rodando")
 
 	fanout.StartConsumer("localhost:9092", func(event events.Event) {
 
@@ -34,7 +34,13 @@ func main() {
 
 func handleFanout(ctx context.Context, rdb *redis.Client, event events.MessageSent) {
 
+	log.Logger.Info("fanout_start",
+		"room_id", event.RoomID,
+		"sender_id", event.SenderID,
+	)
+
 	if !isUserInRoom(rdb, event.SenderID, event.RoomID) {
+		log.Logger.Error("user not in room")
 		return
 	}
 

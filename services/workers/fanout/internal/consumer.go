@@ -3,7 +3,8 @@ package fanout
 import (
 	"context"
 	"encoding/json"
-	"log"
+
+	"github.com/martinsdevv/slickchat/infrastructure/log"
 
 	"github.com/martinsdevv/slickchat/core/events"
 	"github.com/segmentio/kafka-go"
@@ -19,7 +20,7 @@ func StartConsumer(broker string, handler func(events.Event)) {
 	for {
 		msg, err := reader.ReadMessage(context.Background())
 		if err != nil {
-			log.Println(err)
+			log.Logger.Error("Erro ao iniciar consumer: ", err)
 			continue
 		}
 
