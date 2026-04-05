@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/martinsdevv/slickchat/core/application"
 	"github.com/martinsdevv/slickchat/core/events"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
@@ -44,6 +43,16 @@ type OutMessage struct {
 	Payload interface{} `json:"payload"`
 }
 
+type MessageDeliveredPayload struct {
+	MessageID string `json:"message_id"`
+	RoomID    string `json:"room_id"`
+}
+
+type MessageReadPayload struct {
+	MessageID string `json:"message_id"`
+	RoomID    string `json:"room_id"`
+}
+
 func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -54,15 +63,17 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 
 		connectionID := uuid.New().String()
 
-		userID := r.URL.Query().Get("user_id")
-		if userID == "" {
-			userID = "anonymous"
-		}
-		gatewayID := "gateway-1"
-
 		client := &Client{
 			Conn: conn,
 		}
+
+		userID := r.URL.Query().Get("user_id")
+		if userID == "" {
+			sendError(client, "unauthorized")
+			conn.Close()
+			return
+		}
+		gatewayID := "gateway-1"
 
 		mu.Lock()
 		clients[connectionID] = client
@@ -105,13 +116,17 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 				var payload SendMessagePayload
 				json.Unmarshal(msg.Payload, &payload)
 
-				if !isUserInRoom(rdb, userID, payload.RoomID) {
-					sendError(client, "not_in_room")
-					continue
-				}
+				handleSendMessage(rdb, producer, client, userID, payload)
+			case "message_delivered":
+				var payload MessageDeliveredPayload
+				json.Unmarshal(msg.Payload, &payload)
 
-				application.SendMessage(producer, userID, payload.RoomID, payload.Content)
-				sendAck(client)
+				handleMessageDelivered(rdb, producer, client, userID, payload)
+			case "message_read":
+				var payload MessageReadPayload
+				json.Unmarshal(msg.Payload, &payload)
+
+				handleMessageRead(rdb, producer, client, userID, payload)
 			}
 		}
 	}
@@ -121,15 +136,14 @@ func subscribeConnection(rdb *redis.Client, connectionID string) {
 	ctx := context.Background()
 
 	pubsub := rdb.Subscribe(ctx, "connection:"+connectionID)
-
 	ch := pubsub.Channel()
 
 	for msg := range ch {
 
-		var event events.MessageSent
+		var event events.Event
 		json.Unmarshal([]byte(msg.Payload), &event)
 
-		sendToConnection(connectionID, event)
+		handleIncomingEvent(connectionID, event)
 	}
 }
 

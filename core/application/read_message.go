@@ -10,29 +10,22 @@ import (
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 )
 
-func SendMessage(producer *kafkainfra.Producer, userID, roomID, content string) (string, error) {
-	messageID := uuid.New().String()
-
-	payload := events.MessageSent{
+func ReadMessage(producer *kafkainfra.Producer, userID, roomID, messageID string) error {
+	payload := events.MessageRead{
 		MessageID: messageID,
 		RoomID:    roomID,
-		SenderID:  userID,
-		Content:   content,
+		UserID:    userID,
+		ReadAt:    time.Now(),
 	}
 
 	payloadBytes, _ := json.Marshal(payload)
 
 	event := events.Event{
 		ID:        uuid.New().String(),
-		Type:      events.EventTypeMessageSent,
+		Type:      events.EventTypeMessageRead,
 		Timestamp: time.Now(),
 		Payload:   payloadBytes,
 	}
 
-	err := producer.Publish(context.Background(), event)
-	if err != nil {
-		return messageID, err
-	}
-
-	return messageID, nil
+	return producer.Publish(context.Background(), event)
 }
