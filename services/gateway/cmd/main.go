@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	log.Init()
 	rdb := redisinfra.NewClient()
 	producer := kafkainfra.NewProducer("localhost:9092")
 

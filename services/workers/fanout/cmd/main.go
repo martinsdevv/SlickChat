@@ -1,17 +1,21 @@
 package main
 
 import (
+	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
 	redisinfra "github.com/martinsdevv/slickchat/infrastructure/redis"
-	fanout "github.com/martinsdevv/slickchat/services/workers/fanout/internal"
+	"github.com/martinsdevv/slickchat/services/workers/fanout"
 )
 
 func main() {
-	log.Init()
-
 	rdb := redisinfra.NewClient()
 
-	log.Logger.Info("Fanout worker rodando")
+	log.Logger.Info("starting fanout worker")
 
-	fanout.StartConsumer("localhost:9092", fanout.FanoutHandler(rdb))
+	kafkainfra.StartConsumer(
+		"localhost:9092",
+		"message-events",
+		"fanout-group",
+		fanout.FanoutHandler(rdb),
+	)
 }

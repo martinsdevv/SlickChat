@@ -2,10 +2,8 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/martinsdevv/slickchat/core/events"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 )
@@ -15,16 +13,17 @@ func ReadMessage(producer *kafkainfra.Producer, userID, roomID, messageID string
 		MessageID: messageID,
 		RoomID:    roomID,
 		UserID:    userID,
-		ReadAt:    time.Now(),
+		ReadAt:    time.Now().UTC(),
 	}
 
-	payloadBytes, _ := json.Marshal(payload)
+	event, err := events.NewEvent(
+		events.EventTypeMessageRead,
+		roomID,
+		payload,
+	)
 
-	event := events.Event{
-		ID:        uuid.New().String(),
-		Type:      events.EventTypeMessageRead,
-		Timestamp: time.Now(),
-		Payload:   payloadBytes,
+	if err != nil {
+		return err
 	}
 
 	return producer.Publish(context.Background(), event)

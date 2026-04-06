@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,25 +10,33 @@ import (
 )
 
 func SendMessage(producer *kafkainfra.Producer, userID, roomID, content string) (string, error) {
+	ctx := context.Background()
 	messageID := uuid.New().String()
 
 	payload := events.MessageSent{
-		MessageID: messageID,
-		RoomID:    roomID,
-		SenderID:  userID,
-		Content:   content,
+		MessageID:        messageID,
+		RoomID:           roomID,
+		SenderID:         userID,
+		Content:          content,
+		MessageType:      "TEXT",
+		IsZeroLogging:    false,
+		TTL:              0,
+		DestroyAfterRead: false,
+		ExpiresAt:        nil,
+		Timestamp:        time.Now().UTC(),
 	}
 
-	payloadBytes, _ := json.Marshal(payload)
-
-	event := events.Event{
-		ID:        uuid.New().String(),
-		Type:      events.EventTypeMessageSent,
-		Timestamp: time.Now(),
-		Payload:   payloadBytes,
+	event, err := events.NewEvent(
+		events.EventTypeMessageSent,
+		roomID,
+		payload,
+	)
+	if err != nil {
+		return "", err
 	}
 
-	err := producer.Publish(context.Background(), event)
+	err = producer.Publish(ctx, event)
+
 	if err != nil {
 		return messageID, err
 	}

@@ -3,7 +3,9 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 
+	"github.com/martinsdevv/slickchat/core/events"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -21,13 +23,18 @@ func NewProducer(broker string) *Producer {
 	}
 }
 
-func (p *Producer) Publish(ctx context.Context, event interface{}) error {
+func (p *Producer) Publish(ctx context.Context, event events.Event) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
 
 	return p.writer.WriteMessages(ctx, kafka.Message{
+		Key:   []byte(event.PartitionKey),
 		Value: data,
+		Headers: []kafka.Header{
+			{Key: "event_type", Value: []byte(event.EventType)},
+			{Key: "event_version", Value: []byte(strconv.Itoa(event.EventVersion))},
+		},
 	})
 }

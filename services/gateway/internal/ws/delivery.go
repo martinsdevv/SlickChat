@@ -72,7 +72,7 @@ func sendToConnection(connectionID, msgType string, payload interface{}) {
 }
 
 func handleIncomingEvent(connectionID string, event events.Event) {
-	switch event.Type {
+	switch event.EventType {
 
 	case events.EventTypeMessageSent:
 		sendToConnection(connectionID, "message.received", json.RawMessage(event.Payload))
