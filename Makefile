@@ -1,5 +1,5 @@
 .PHONY: infra-up infra-down infra-logs infra-reset \
-        run-api run-gateway run-fanout
+        run-api run-gateway run-fanout run-persistence
 
 COMPOSE_FILE=./deploy/compose.yml
 
@@ -15,7 +15,6 @@ infra-logs:
 infra-reset:
 	docker compose -f $(COMPOSE_FILE) down -v
 
-# 🚀 serviços
 run-api:
 	go run ./services/api/cmd
 
@@ -24,6 +23,9 @@ run-gateway:
 
 run-fanout:
 	go run ./services/workers/fanout/cmd
+
+run-persistence:
+	go run ./services/workers/persistence/cmd
 
 psql:
 	docker exec -it slickchat-postgres psql -U postgres -d slickchat
