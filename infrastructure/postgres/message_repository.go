@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/google/uuid"
 	"github.com/martinsdevv/slickchat/core/contracts"
 	"github.com/martinsdevv/slickchat/core/domain"
 )
@@ -49,7 +50,7 @@ func (r *MessageRepository) Save(ctx context.Context, msg *domain.Message) error
 	return err
 }
 
-func (r *MessageRepository) ListByRoom(ctx context.Context, roomID string, limit int) ([]*domain.Message, error) {
+func (r *MessageRepository) ListByRoom(ctx context.Context, roomID uuid.UUID, limit int) ([]*domain.Message, error) {
 	query := `
 		SELECT id, room_id, sender_id, content, message_type, ttl, destroy_after_read, created_at, expires_at
 		FROM messages
@@ -89,5 +90,16 @@ func (r *MessageRepository) ListByRoom(ctx context.Context, roomID string, limit
 		messages = append(messages, &msg)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return messages, nil
+}
+
+func (r *MessageRepository) Delete(ctx context.Context, messageID uuid.UUID) error {
+	query := `DELETE FROM messages WHERE id = $1`
+
+	_, err := r.db.ExecContext(ctx, query, messageID)
+	return err
 }

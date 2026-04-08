@@ -6,6 +6,7 @@ const (
 	EventTypeMessageSent      = "message.sent.v1"
 	EventTypeMessageDelivered = "message.delivered.v1"
 	EventTypeMessageRead      = "message.read.v1"
+	EventTypeMessageDeleted   = "message.deleted.v1"
 )
 
 type MessageSent struct {
@@ -18,7 +19,7 @@ type MessageSent struct {
 	TTL              int        `json:"ttl"`
 	DestroyAfterRead bool       `json:"destroy_after_read"`
 	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
-	Timestamp        time.Time  `json:"timestamp"`
+	SentAt           time.Time  `json:"sent_at"`
 }
 
 type MessageDelivered struct {
@@ -33,4 +34,10 @@ type MessageRead struct {
 	RoomID    string    `json:"room_id"`
 	UserID    string    `json:"user_id"`
 	ReadAt    time.Time `json:"read_at"`
+}
+
+type MessageDeleted struct {
+	MessageID string    `json:"message_id"`
+	RoomID    string    `json:"room_id"`
+	DeletedAt time.Time `json:"deleted_at"`
 }

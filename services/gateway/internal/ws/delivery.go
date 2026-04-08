@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/martinsdevv/slickchat/core/application"
+	"github.com/martinsdevv/slickchat/core/domain"
 	"github.com/martinsdevv/slickchat/core/events"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
@@ -25,7 +27,24 @@ func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client 
 		return
 	}
 
-	messageID, err := application.SendMessage(producer, userID, payload.RoomID, payload.Content)
+	room := &domain.Room{
+		ID:          uuid.MustParse(payload.RoomID),
+		ZeroLogging: false,
+	}
+
+	membership := &domain.RoomMembership{
+		UserID: uuid.MustParse(userID),
+		Role:   domain.RoleMember,
+	}
+
+	messageID, err := application.SendMessage(
+		producer,
+		room,
+		membership,
+		uuid.MustParse(userID),
+		payload.Content,
+	)
+
 	if err != nil {
 		log.Logger.Error("Erro ao enviar mensagem: ", err)
 		sendError(client, "internal_error")
@@ -82,6 +101,9 @@ func handleIncomingEvent(connectionID string, event events.Event) {
 
 	case events.EventTypeMessageRead:
 		sendToConnection(connectionID, "message.read", json.RawMessage(event.Payload))
+
+	case events.EventTypeMessageDeleted:
+		sendToConnection(connectionID, "message.deleted", json.RawMessage(event.Payload))
 	}
 }
 
@@ -98,4 +120,59 @@ func handleMessageRead(
 	}
 
 	application.ReadMessage(producer, userID, payload.RoomID, payload.MessageID)
+}
+
+func handleDeleteMessage(
+	rdb *redis.Client,
+	producer *kafkainfra.Producer,
+	client *Client,
+	userID string,
+	payload MessageDeletePayload,
+) {
+	if !isUserInRoom(rdb, userID, payload.RoomID) {
+		sendError(client, "not_in_room")
+		return
+	}
+
+	if payload.MessageID == "" {
+		sendError(client, "invalid_message_id")
+		return
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		sendError(client, "invalid_user_id")
+		return
+	}
+
+	roomUUID, err := uuid.Parse(payload.RoomID)
+	if err != nil {
+		sendError(client, "invalid_room_id")
+		return
+	}
+
+	messageUUID, err := uuid.Parse(payload.MessageID)
+	if err != nil {
+		sendError(client, "invalid_message_id")
+		return
+	}
+
+	err = application.DeleteMessage(
+		producer,
+		&domain.Room{ID: roomUUID},
+		&domain.RoomMembership{
+			UserID: userUUID,
+			Role:   domain.RoleMember,
+		},
+		userUUID,
+		messageUUID,
+		userUUID, // TEMP
+	)
+
+	if err != nil {
+		sendError(client, "delete_failed")
+		return
+	}
+
+	sendAck(client)
 }

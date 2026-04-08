@@ -1,5 +1,5 @@
 .PHONY: infra-up infra-down infra-logs infra-reset \
-        run-api run-gateway run-fanout run-persistence
+        run-api run-gateway run-fanout run-persistence dev-up dev-down
 
 COMPOSE_FILE=./deploy/compose.yml
 
@@ -32,3 +32,16 @@ psql:
 
 redis-cli:
 	docker exec -it slickchat-redis redis-cli
+
+dev-up: infra-up
+	kitty @ launch --type=window --cwd $(PWD) --title "persistence" make run-persistence
+	kitty @ launch --type=window --cwd $(PWD) --title "fanout" make run-fanout
+	kitty @ launch --type=window --cwd $(PWD) --title "api" make run-api
+	kitty @ launch --type=window --cwd $(PWD) --title "gateway" make run-gateway
+
+dev-down:
+	-@kitty @ close-window --match title:persistence
+	-@kitty @ close-window --match title:fanout
+	-@kitty @ close-window --match title:api
+	-@kitty @ close-window --match title:gateway
+	$(MAKE) infra-down

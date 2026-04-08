@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/martinsdevv/slickchat/core/contracts"
 	"github.com/martinsdevv/slickchat/core/domain"
 )
@@ -17,10 +18,16 @@ func NewMessageHandler(repo contracts.MessageRepository) *MessageHandler {
 }
 
 func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
-	roomID := r.URL.Query().Get("room_id")
+	rawRoomID := r.URL.Query().Get("room_id")
 
-	if roomID == "" {
+	if rawRoomID == "" {
 		http.Error(w, "room_id required", http.StatusBadRequest)
+		return
+	}
+
+	roomID, err := uuid.Parse(rawRoomID)
+	if err != nil {
+		http.Error(w, "invalid room_id", http.StatusBadRequest)
 		return
 	}
 
@@ -41,7 +48,7 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 
 func toResponse(msg *domain.Message) MessageResponse {
 	return MessageResponse{
-		ID:        msg.ID,
+		ID:        msg.ID.String(),
 		Content:   msg.Content,
 		Type:      msg.MessageType,
 		CreatedAt: msg.CreatedAt,

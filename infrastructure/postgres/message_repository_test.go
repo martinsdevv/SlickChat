@@ -22,9 +22,9 @@ func TestMessageRepository_Save(t *testing.T) {
 	repo := NewMessageRepository(db)
 
 	msg := &domain.Message{
-		ID:          uuid.New().String(),
-		RoomID:      uuid.New().String(),
-		SenderID:    uuid.New().String(),
+		ID:          uuid.New(),
+		RoomID:      uuid.New(),
+		SenderID:    uuid.New(),
 		Content:     "hello test",
 		MessageType: "TEXT",
 		TTL:         0,

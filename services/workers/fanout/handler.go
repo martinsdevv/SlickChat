@@ -31,6 +31,9 @@ func FanoutHandler(rdb *redis.Client) func(events.Event) {
 
 		case events.EventTypeMessageRead:
 			handleMessageRead(event, rdb)
+
+		case events.EventTypeMessageDeleted:
+			handleMessageDeleted(event, rdb)
 		}
 	}
 }
@@ -160,4 +163,23 @@ func isUserInRoom(rdb *redis.Client, userID, roomID string) bool {
 	}
 
 	return exists
+}
+
+func handleMessageDeleted(event events.Event, rdb *redis.Client) {
+	ctx := context.Background()
+
+	var payload events.MessageDeleted
+	json.Unmarshal(event.Payload, &payload)
+
+	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()
+
+	eventBytes, _ := json.Marshal(event)
+
+	for _, userID := range members {
+		connections, _ := rdb.SMembers(ctx, "user_connections:"+userID).Result()
+
+		for _, connID := range connections {
+			rdb.Publish(ctx, "connection:"+connID, eventBytes)
+		}
+	}
 }

@@ -8,12 +8,18 @@ import (
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 )
 
-func DeliverMessage(producer *kafkainfra.Producer, userID, roomID, messageID string) error {
+func DeliverMessage(
+	producer *kafkainfra.Producer,
+	userID, roomID, messageID string,
+) error {
+
+	now := time.Now().UTC()
+
 	payload := events.MessageDelivered{
 		MessageID:   messageID,
 		RoomID:      roomID,
 		UserID:      userID,
-		DeliveredAt: time.Now().UTC(),
+		DeliveredAt: now,
 	}
 
 	event, err := events.NewEvent(
@@ -21,7 +27,6 @@ func DeliverMessage(producer *kafkainfra.Producer, userID, roomID, messageID str
 		roomID,
 		payload,
 	)
-
 	if err != nil {
 		return err
 	}

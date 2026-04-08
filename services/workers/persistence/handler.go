@@ -3,7 +3,9 @@ package persistence
 import (
 	"context"
 	"encoding/json"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
 
 	"github.com/martinsdevv/slickchat/core/contracts"
@@ -29,6 +31,9 @@ func (h *Handler) Handle(event events.Event) {
 	case events.EventTypeMessageSent:
 		h.handleMessageSent(event)
 
+	case events.EventTypeMessageDeleted:
+		h.handleMessageDeleted(event)
+
 	default:
 		log.Logger.Warn("unknown event type",
 			"event_type", event.EventType,
@@ -50,15 +55,40 @@ func (h *Handler) handleMessageSent(event events.Event) {
 		return
 	}
 
+	id, err := uuid.Parse(payload.MessageID)
+	if err != nil {
+		log.Logger.Error("invalid message id", "error", err)
+		return
+	}
+
+	roomID, err := uuid.Parse(payload.RoomID)
+	if err != nil {
+		log.Logger.Error("invalid room id", "error", err)
+		return
+	}
+
+	senderID, err := uuid.Parse(payload.SenderID)
+	if err != nil {
+		log.Logger.Error("invalid sender id", "error", err)
+		return
+	}
+
+	expiresAt := payload.ExpiresAt
+
+	if expiresAt == nil && payload.TTL > 0 {
+		t := payload.SentAt.Add(time.Duration(payload.TTL) * time.Second)
+		expiresAt = &t
+	}
+
 	msg := &domain.Message{
-		ID:               payload.MessageID,
-		RoomID:           payload.RoomID,
-		SenderID:         payload.SenderID,
+		ID:               id,
+		RoomID:           roomID,
+		SenderID:         senderID,
 		Content:          payload.Content,
 		MessageType:      payload.MessageType,
 		TTL:              payload.TTL,
-		CreatedAt:        payload.Timestamp,
-		ExpiresAt:        payload.ExpiresAt,
+		CreatedAt:        payload.SentAt,
+		ExpiresAt:        expiresAt,
 		DestroyAfterRead: payload.DestroyAfterRead,
 	}
 
@@ -68,4 +98,26 @@ func (h *Handler) handleMessageSent(event events.Event) {
 	}
 
 	log.Logger.Info("message persisted", "message_id:", msg.ID)
+}
+
+func (h *Handler) handleMessageDeleted(event events.Event) {
+	var payload events.MessageDeleted
+
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Logger.Error("failed to unmarshal payload", "error", err)
+		return
+	}
+
+	id, err := uuid.Parse(payload.MessageID)
+	if err != nil {
+		log.Logger.Error("invalid message id", "error", err)
+		return
+	}
+
+	if err := h.repo.Delete(context.Background(), id); err != nil {
+		log.Logger.Error("failed to delete message", "error", err)
+		return
+	}
+
+	log.Logger.Info("message deleted", "message_id", payload.MessageID)
 }

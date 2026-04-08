@@ -53,6 +53,11 @@ type MessageReadPayload struct {
 	RoomID    string `json:"room_id"`
 }
 
+type MessageDeletePayload struct {
+	MessageID string `json:"message_id"`
+	RoomID    string `json:"room_id"`
+}
+
 func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -127,6 +132,15 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 				json.Unmarshal(msg.Payload, &payload)
 
 				handleMessageRead(rdb, producer, client, userID, payload)
+
+			case "delete_message":
+				var payload MessageDeletePayload
+				err := json.Unmarshal(msg.Payload, &payload)
+				if err != nil {
+					log.Logger.Error("error in the payload:", err)
+				}
+
+				handleDeleteMessage(rdb, producer, client, userID, payload)
 			}
 		}
 	}

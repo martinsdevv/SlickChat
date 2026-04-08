@@ -5,41 +5,53 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/martinsdevv/slickchat/core/domain"
 	"github.com/martinsdevv/slickchat/core/events"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 )
 
-func SendMessage(producer *kafkainfra.Producer, userID, roomID, content string) (string, error) {
-	ctx := context.Background()
-	messageID := uuid.New().String()
+func SendMessage(
+	producer *kafkainfra.Producer,
+	room *domain.Room,
+	membership *domain.RoomMembership,
+	userID uuid.UUID,
+	content string,
+) (string, error) {
+
+	now := time.Now().UTC()
+
+	// valida domínio
+	if err := room.CanUserSendMessage(userID, membership.Role, now); err != nil {
+		return "", err
+	}
+
+	messageID := uuid.New()
 
 	payload := events.MessageSent{
-		MessageID:        messageID,
-		RoomID:           roomID,
-		SenderID:         userID,
+		MessageID:        messageID.String(),
+		RoomID:           room.ID.String(),
+		SenderID:         userID.String(),
 		Content:          content,
 		MessageType:      "TEXT",
-		IsZeroLogging:    false,
-		TTL:              0,
+		IsZeroLogging:    !room.CanPersistMessages(),
+		TTL:              room.TTL,
 		DestroyAfterRead: false,
-		ExpiresAt:        nil,
-		Timestamp:        time.Now().UTC(),
+		ExpiresAt:        room.ExpiresAt,
+		SentAt:           now,
 	}
 
 	event, err := events.NewEvent(
 		events.EventTypeMessageSent,
-		roomID,
+		room.ID.String(),
 		payload,
 	)
 	if err != nil {
 		return "", err
 	}
 
-	err = producer.Publish(ctx, event)
-
-	if err != nil {
-		return messageID, err
+	if err := producer.Publish(context.Background(), event); err != nil {
+		return messageID.String(), err
 	}
 
-	return messageID, nil
+	return messageID.String(), nil
 }
