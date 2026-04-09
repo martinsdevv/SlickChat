@@ -79,6 +79,7 @@ func toResponse(msg *domain.Message) MessageResponse {
 type RoomContextResponse struct {
 	RoomID       string     `json:"room_id"`
 	Type         string     `json:"type"`
+	OwnerID      string     `json:"owner_id,omitempty"`
 	TTL          int        `json:"ttl"`
 	ParanoidMode bool       `json:"paranoid_mode"`
 	ZeroLogging  bool       `json:"zero_logging"`
@@ -122,6 +123,7 @@ func (h *RoomContextHandler) GetRoomContext(w http.ResponseWriter, r *http.Reque
 	resp := RoomContextResponse{
 		RoomID:       room.ID.String(),
 		Type:         string(room.Type),
+		OwnerID:      room.OwnerID.String(),
 		TTL:          room.TTL,
 		ParanoidMode: room.ParanoidMode,
 		ZeroLogging:  room.ZeroLogging,

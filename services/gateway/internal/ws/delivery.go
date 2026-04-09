@@ -24,6 +24,7 @@ type WSMessage struct {
 type roomContextResponse struct {
 	RoomID       string     `json:"room_id"`
 	Type         string     `json:"type"`
+	OwnerID      string     `json:"owner_id,omitempty"`
 	TTL          int        `json:"ttl"`
 	ParanoidMode bool       `json:"paranoid_mode"`
 	ZeroLogging  bool       `json:"zero_logging"`
@@ -102,6 +103,13 @@ func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, use
 		ParanoidMode: rc.ParanoidMode,
 		ZeroLogging:  rc.ZeroLogging,
 		ExpiresAt:    rc.ExpiresAt,
+	}
+	if rc.OwnerID != "" {
+		ownerUUID, err := uuid.Parse(rc.OwnerID)
+		if err != nil {
+			return nil, nil, err
+		}
+		room.OwnerID = ownerUUID
 	}
 
 	membership := &domain.RoomMembership{
@@ -255,7 +263,30 @@ func handleMessageRead(
 		return
 	}
 
-	application.ReadMessage(producer, userID, payload.RoomID, payload.MessageID)
+	if _, err := uuid.Parse(payload.RoomID); err != nil {
+		sendError(client, "invalid_room_id")
+		return
+	}
+	if _, err := uuid.Parse(payload.MessageID); err != nil {
+		sendError(client, "invalid_message_id")
+		return
+	}
+
+	_ = application.ReadMessage(producer, userID, payload.RoomID, payload.MessageID)
+
+	ctx := context.Background()
+	mc, err := fetchMessageContext(ctx, "http://localhost:8081", payload.MessageID)
+	if err != nil {
+		// read já foi publicado; falha de auto-delete não pode derrubar a sessão
+		log.Logger.Error("message context failed", "error", err)
+		return
+	}
+	if mc.RoomID != payload.RoomID {
+		return
+	}
+	if mc.DestroyAfterRead {
+		_ = application.AutoDeleteMessage(producer, payload.RoomID, payload.MessageID)
+	}
 }
 
 func handleDeleteMessage(

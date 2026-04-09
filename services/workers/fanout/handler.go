@@ -107,6 +107,24 @@ func handleMessageSent(event events.Event, rdb *redis.Client) {
 	}
 }
 
+func decrUnreadClamp0(rdb *redis.Client, userID string, roomID string) {
+	ctx := context.Background()
+
+	key := "user:" + userID + ":room:" + roomID + ":unread"
+
+	// decr e garante >= 0
+	script := redis.NewScript(`
+local v = redis.call("DECR", KEYS[1])
+if v < 0 then
+  redis.call("SET", KEYS[1], 0)
+  return 0
+end
+return v
+`)
+
+	_, _ = script.Run(ctx, rdb, []string{key}).Result()
+}
+
 func handleMessageRead(event events.Event, rdb *redis.Client) {
 	ctx := context.Background()
 
@@ -175,10 +193,15 @@ func handleMessageDeleted(event events.Event, rdb *redis.Client) {
 	json.Unmarshal(event.Payload, &payload)
 
 	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()
+	senderID := getMessageSender(rdb, payload.MessageID)
 
 	eventBytes, _ := json.Marshal(event)
 
 	for _, userID := range members {
+		if senderID != "" && userID != senderID {
+			decrUnreadClamp0(rdb, userID, payload.RoomID)
+		}
+
 		connections, _ := rdb.SMembers(ctx, "user_connections:"+userID).Result()
 
 		for _, connID := range connections {
@@ -194,10 +217,15 @@ func handleMessageExpired(event events.Event, rdb *redis.Client) {
 	json.Unmarshal(event.Payload, &payload)
 
 	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()
+	senderID := getMessageSender(rdb, payload.MessageID)
 
 	eventBytes, _ := json.Marshal(event)
 
 	for _, userID := range members {
+		if senderID != "" && userID != senderID {
+			decrUnreadClamp0(rdb, userID, payload.RoomID)
+		}
+
 		connections, _ := rdb.SMembers(ctx, "user_connections:"+userID).Result()
 
 		for _, connID := range connections {

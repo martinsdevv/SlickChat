@@ -67,6 +67,11 @@ func (r *Room) CanDeleteMessage(
 		return ErrRoomExpired
 	}
 
+	// dono da sala pode deletar
+	if r.OwnerID != uuid.Nil && userID == r.OwnerID {
+		return nil
+	}
+
 	// dono da mensagem pode deletar
 	if userID == messageSenderID {
 		return nil
