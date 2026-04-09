@@ -1,5 +1,5 @@
 .PHONY: infra-up infra-down infra-logs infra-reset \
-        run-api run-gateway run-fanout run-persistence dev-up dev-down
+        run-api run-gateway run-fanout run-persistence run-ttl dev-up dev-down
 
 COMPOSE_FILE=./deploy/compose.yml
 
@@ -27,6 +27,9 @@ run-fanout:
 run-persistence:
 	go run ./services/workers/persistence/cmd
 
+run-ttl:
+	go run ./services/workers/ttl/cmd
+
 psql:
 	docker exec -it slickchat-postgres psql -U postgres -d slickchat
 
@@ -36,12 +39,14 @@ redis-cli:
 dev-up: infra-up
 	kitty @ launch --type=window --cwd $(PWD) --title "persistence" make run-persistence
 	kitty @ launch --type=window --cwd $(PWD) --title "fanout" make run-fanout
+	kitty @ launch --type=window --cwd $(PWD) --title "ttl" make run-ttl
 	kitty @ launch --type=window --cwd $(PWD) --title "api" make run-api
 	kitty @ launch --type=window --cwd $(PWD) --title "gateway" make run-gateway
 
 dev-down:
 	-@kitty @ close-window --match title:persistence
 	-@kitty @ close-window --match title:fanout
+	-@kitty @ close-window --match title:ttl
 	-@kitty @ close-window --match title:api
 	-@kitty @ close-window --match title:gateway
 	$(MAKE) infra-down

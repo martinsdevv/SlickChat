@@ -4,6 +4,16 @@
 
 Este documento detalha a experiência do usuário (UX) e a modelagem da interface do usuário (UI) para o sistema SlickChat. Ele estabelece diretrizes e princípios para garantir que a interface seja consistente, intuitiva e alinhada com os valores fundamentais do produto: anonimato, privacidade e efemeridade. O objetivo é traduzir os conceitos técnicos subjacentes em uma interação fluida e compreensível para o usuário final.
 
+## 1.1 Stack de implementação (front-end)
+
+A interface será uma **SPA em React** (componentes funcionais, hooks), com as seguintes escolhas técnicas complementares:
+
+*   **React:** biblioteca base da UI — composição de telas e componentes, ciclo de vida e efeitos colaterais via hooks (ex.: assinatura WebSocket, sincronização com o servidor), e integração natural com o ecossistema front-end.
+*   **Tailwind CSS:** estilização utilitária em cima de React, com design tokens via configuração do tema (cores, tipografia, espaçamento) e componentes com classes consistentes. Responsividade **mobile-first** (estilos base para telas pequenas, depois `sm:`, `md:`, `lg:`, `xl:`, `2xl:` conforme necessário).
+*   **Zustand:** estado global da UI e do cliente em React (ex.: sala ativa, lista de conversas em cache, preferências locais, estado de conexão WebSocket) com stores leves e seletores, evitando prop drilling e mantendo reatividade simples junto ao modelo do React.
+
+Detalhes de **breakpoints, layout e comportamento por tamanho de tela** estão na seção [18.1 Responsividade](#181-responsividade).
+
 ---
 
 # 2. Posicionamento do Produto
@@ -149,7 +159,7 @@ Estado inicial:
 
 ## 6.1 Layout Principal
 
-O layout da aplicação seguirá um modelo responsivo e adaptável, inspirado em aplicações de chat modernas, para garantir uma experiência consistente em diferentes tamanhos de tela.
+O layout da aplicação seguirá um modelo responsivo e adaptável (React + Tailwind, abordagem mobile-first), inspirado em aplicações de chat modernas, para garantir uma experiência consistente em diferentes tamanhos de tela. O estado de navegação (sala selecionada, sidebar aberta/fechada) pode ser centralizado em Zustand para manter o mesmo comportamento entre breakpoints.
 
 ### Sidebar (Navegação Esquerda)
 
@@ -457,19 +467,38 @@ Esta seção estabelece as diretrizes visuais e de usabilidade para o SlickChat,
 
 ## 18.1 Responsividade
 
-O sistema deve ser totalmente responsivo, adaptando-se a diferentes tamanhos de tela (desktop, tablet, mobile) para garantir usabilidade e consistência em qualquer dispositivo.
+O sistema deve ser totalmente responsivo, adaptando-se a diferentes tamanhos de tela (mobile, tablet, desktop) com **Tailwind CSS** em modelo **mobile-first**: estilos sem prefixo valem para a menor largura; prefixos `sm:`, `md:`, `lg:`, `xl:` e `2xl:` refinam o layout conforme a viewport cresce.
 
-*   **Grid System:** Utilização de um sistema de grid flexível (ex: classes `col-md-x`, `col-lg-x` do Bootstrap) para organização de conteúdo.
-*   **Breakpoints:** Priorizar os breakpoints padrão de frameworks como Bootstrap (sm, md, lg, xl) para garantir a adaptação do layout.
-*   **Elementos Adaptáveis:** Componentes de navegação (sidebar), painéis e inputs devem ajustar seu comportamento ou serem recolhidos/expandidos em telas menores.
-*   **Touch-Friendly:** Elementos interativos devem ser dimensionados para facilitar a interação por toque em dispositivos móveis.
+### Breakpoints de referência (Tailwind)
+
+| Prefixo | Largura mínima | Uso típico no SlickChat |
+| ------- | -------------- | ----------------------- |
+| (base)  | abaixo de 640px | Uma coluna; lista de chats em tela cheia ou drawer; painel direito como overlay/modal. |
+| `sm:`   | 640px          | Ajustes de padding e tipografia; botões em linha quando couber. |
+| `md:`   | 768px          | Sidebar pode aparecer como coluna fixa ou drawer persistente; área de mensagem com largura confortável. |
+| `lg:`   | 1024px         | Layout estilo desktop: sidebar + thread + painel opcional em três colunas quando aplicável. |
+| `xl:`   | 1280px         | Mais respiro horizontal; modais menos largos em relação à viewport. |
+| `2xl:`  | 1536px         | Opcional: limitar `max-width` do conteúdo para legibilidade em monitores muito largos. |
+
+### Comportamento por faixa
+
+*   **Mobile (abaixo do breakpoint `md`):** priorizar uma coisa por vez: lista de conversas **ou** chat aberto; sidebar/recolhimento via botão (estado pode ficar em Zustand); inputs e CTAs com área mínima de toque (~44px); evitar hover como único meio de revelar ações críticas.
+*   **Tablet (md a lg):** sidebar colapsável ou ícone + labels condensados; painel direito opcional em sheet/drawer.
+*   **Desktop (lg+):** sidebar visível, área central flexível, painel direito expansível sem cobrir o chat inteiro quando fizer sentido.
+
+### Layout e utilitários
+
+*   **Grid / flex:** `grid`, `flex`, `gap-*`, `min-h-screen`, `min-h-dvh` (quando suportado) para altura útil em mobile com barra de endereço.
+*   **Conteúdo legível:** `max-w-*` / `container` com margens laterais para não esticar linhas de texto em telas largas.
+*   **Overflow:** listas de mensagens com scroll independente (`overflow-y-auto`, `min-h-0` em flex children) para o input fixo no rodapé.
+*   **Touch-friendly:** alvos tocáveis com `min-h-*` / `min-w-*` ou padding adequado; espaçamento entre itens clicáveis para evitar toques errados.
 
 ## 18.2 Tipografia
 
 A escolha da tipografia visa clareza, legibilidade e um toque moderno.
 
 *   **Font-Family:** Será utilizada uma família de fontes sem serifa (sans-serif) de fácil leitura (ex: `Roboto`, `Inter`, `Open Sans`).
-*   **Hierarquia Visual:** Tamanhos e pesos de fonte (ex: `h1` a `h6`, `text-muted` do Bootstrap) bem definidos para cabeçalhos, corpo de texto e informações auxiliares.
+*   **Hierarquia Visual:** Tamanhos e pesos de fonte bem definidos via Tailwind (ex.: `text-sm` / `text-base` / `text-lg`, `font-semibold`, `text-zinc-400` ou token equivalente no tema) para cabeçalhos, corpo de texto e informações auxiliares.
 *   **Legibilidade:** Contraste adequado entre texto e fundo, garantindo acessibilidade.
 
 ## 18.3 Paleta de Cores
@@ -523,11 +552,11 @@ O design deve ser acessível a um público amplo.
 
 ## 18.8 Padrões de Componentes
 
-Para a implementação, serão adotados padrões de componentes que facilitam a reutilização e manutenção. O uso de um framework UI (como Bootstrap ou um design system customizado) é recomendado para acelerar o desenvolvimento e garantir a consistência.
+Para a implementação, os componentes reutilizáveis serão **componentes React** estilizados com **Tailwind** (e `@apply` no CSS apenas quando reduzir repetição real), alinhados ao tema do projeto. Estado compartilhado entre telas (ex.: conversa ativa, preferências de UI) fica em **Zustand**, mantendo componentes principalmente apresentacionais.
 
-*   **Botões:** `btn btn-primary`, `btn btn-secondary`, `btn btn-danger`, `btn btn-link`.
-*   **Alertas:** `alert alert-success`, `alert alert-warning`, `alert alert-danger`, `alert alert-info`.
-*   **Formulários:** `form-control`, `form-label`, `is-invalid`, `valid-feedback`, `invalid-feedback`.
-*   **Layout:** `container`, `row`, `col-*-*`, `d-flex`, `justify-content-*`, `align-items-*`.
-*   **Navegação:** `nav`, `nav-item`, `nav-link`, `dropdown`.
+*   **Botões:** variantes com `rounded-*`, `px-*` / `py-*`, `font-medium`, cores do tema (`bg-*`, `text-*`, `hover:`, `active:`, `disabled:opacity-*`).
+*   **Alertas / feedback:** `border`, `rounded-*`, `bg-*` / `text-*`, ícone + texto; toasts posicionados com `fixed` e z-index consistente.
+*   **Formulários:** `w-full`, `border`, `rounded-*`, `focus:ring-*` / `focus:outline-none`, estados de erro com `border-red-*` e mensagem associada (`aria-invalid` quando aplicável).
+*   **Layout:** `flex`, `grid`, `gap-*`, `items-*`, `justify-*`, responsividade com prefixos `md:`, `lg:` conforme [18.1](#181-responsividade).
+*   **Navegação:** listas com `flex` ou `grid`; dropdowns com posicionamento `absolute` + `z-*` ou componente headless compatível com Tailwind.
 

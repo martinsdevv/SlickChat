@@ -34,6 +34,9 @@ func (h *Handler) Handle(event events.Event) {
 	case events.EventTypeMessageDeleted:
 		h.handleMessageDeleted(event)
 
+	case events.EventTypeMessageExpired:
+		h.handleMessageExpired(event)
+
 	default:
 		log.Logger.Warn("unknown event type",
 			"event_type", event.EventType,
@@ -120,4 +123,26 @@ func (h *Handler) handleMessageDeleted(event events.Event) {
 	}
 
 	log.Logger.Info("message deleted", "message_id", payload.MessageID)
+}
+
+func (h *Handler) handleMessageExpired(event events.Event) {
+	var payload events.MessageExpired
+
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Logger.Error("failed to unmarshal payload", "error", err)
+		return
+	}
+
+	id, err := uuid.Parse(payload.MessageID)
+	if err != nil {
+		log.Logger.Error("invalid message id", "error", err)
+		return
+	}
+
+	if err := h.repo.Delete(context.Background(), id); err != nil {
+		log.Logger.Error("failed to delete expired message", "error", err)
+		return
+	}
+
+	log.Logger.Info("message expired removed", "message_id", payload.MessageID)
 }

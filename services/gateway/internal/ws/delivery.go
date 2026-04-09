@@ -3,6 +3,8 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,22 +21,101 @@ type WSMessage struct {
 	Payload interface{} `json:"payload"`
 }
 
-func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client *Client, userID string, payload SendMessagePayload) {
-	ctx := context.Background()
+type roomContextResponse struct {
+	RoomID       string     `json:"room_id"`
+	Type         string     `json:"type"`
+	TTL          int        `json:"ttl"`
+	ParanoidMode bool       `json:"paranoid_mode"`
+	ZeroLogging  bool       `json:"zero_logging"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+	Role         string     `json:"role"`
+}
 
-	if !isUserInRoom(rdb, userID, payload.RoomID) {
-		sendError(client, "not_in_room")
-		return
+func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, userID string) (*domain.Room, *domain.RoomMembership, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		apiBaseURL+"/room-context?room_id="+roomID+"&user_id="+userID,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound {
+			return nil, nil, errors.New("not_in_room")
+		}
+		return nil, nil, errors.New("room_context_failed")
+	}
+
+	var rc roomContextResponse
+	if err := json.NewDecoder(resp.Body).Decode(&rc); err != nil {
+		return nil, nil, err
+	}
+
+	roomUUID, err := uuid.Parse(rc.RoomID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rt := domain.RoomType(rc.Type)
+	switch rt {
+	case domain.RoomTypePublic, domain.RoomTypePrivate, domain.RoomTypeDirect, domain.RoomTypeTemporary:
+		// ok
+	default:
+		return nil, nil, errors.New("invalid_room_type")
+	}
+
+	role := domain.Role(rc.Role)
+	switch role {
+	case domain.RoleAdmin, domain.RoleModerator, domain.RoleMember:
+		// ok
+	default:
+		return nil, nil, errors.New("invalid_role")
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	room := &domain.Room{
-		ID:          uuid.MustParse(payload.RoomID),
-		ZeroLogging: false,
+		ID:           roomUUID,
+		Type:         rt,
+		TTL:          rc.TTL,
+		ParanoidMode: rc.ParanoidMode,
+		ZeroLogging:  rc.ZeroLogging,
+		ExpiresAt:    rc.ExpiresAt,
 	}
 
 	membership := &domain.RoomMembership{
-		UserID: uuid.MustParse(userID),
-		Role:   domain.RoleMember,
+		UserID: userUUID,
+		Role:   role,
+	}
+
+	return room, membership, nil
+}
+
+func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client *Client, userID string, payload SendMessagePayload) {
+	ctx := context.Background()
+
+	room, membership, err := fetchRoomContext(ctx, "http://localhost:8081", payload.RoomID, userID)
+	if err != nil {
+		if err.Error() == "not_in_room" {
+			sendError(client, "not_in_room")
+			return
+		}
+		log.Logger.Error("room context failed", "error", err)
+		sendError(client, "internal_error")
+		return
 	}
 
 	messageID, err := application.SendMessage(
@@ -104,6 +185,9 @@ func handleIncomingEvent(connectionID string, event events.Event) {
 
 	case events.EventTypeMessageDeleted:
 		sendToConnection(connectionID, "message.deleted", json.RawMessage(event.Payload))
+
+	case events.EventTypeMessageExpired:
+		sendToConnection(connectionID, "message.expired", json.RawMessage(event.Payload))
 	}
 }
 
@@ -129,11 +213,6 @@ func handleDeleteMessage(
 	userID string,
 	payload MessageDeletePayload,
 ) {
-	if !isUserInRoom(rdb, userID, payload.RoomID) {
-		sendError(client, "not_in_room")
-		return
-	}
-
 	if payload.MessageID == "" {
 		sendError(client, "invalid_message_id")
 		return
@@ -145,9 +224,15 @@ func handleDeleteMessage(
 		return
 	}
 
-	roomUUID, err := uuid.Parse(payload.RoomID)
+	ctx := context.Background()
+	room, membership, err := fetchRoomContext(ctx, "http://localhost:8081", payload.RoomID, userID)
 	if err != nil {
-		sendError(client, "invalid_room_id")
+		if err.Error() == "not_in_room" {
+			sendError(client, "not_in_room")
+			return
+		}
+		log.Logger.Error("room context failed", "error", err)
+		sendError(client, "internal_error")
 		return
 	}
 
@@ -159,11 +244,8 @@ func handleDeleteMessage(
 
 	err = application.DeleteMessage(
 		producer,
-		&domain.Room{ID: roomUUID},
-		&domain.RoomMembership{
-			UserID: userUUID,
-			Role:   domain.RoleMember,
-		},
+		room,
+		membership,
 		userUUID,
 		messageUUID,
 		userUUID, // TEMP

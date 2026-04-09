@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/martinsdevv/slickchat/core/contracts"
@@ -61,6 +62,52 @@ func (r *MessageRepository) ListByRoom(ctx context.Context, roomID uuid.UUID, li
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, roomID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*domain.Message
+
+	for rows.Next() {
+		var msg domain.Message
+
+		err := rows.Scan(
+			&msg.ID,
+			&msg.RoomID,
+			&msg.SenderID,
+			&msg.Content,
+			&msg.MessageType,
+			&msg.TTL,
+			&msg.DestroyAfterRead,
+			&msg.CreatedAt,
+			&msg.ExpiresAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		messages = append(messages, &msg)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return messages, nil
+}
+
+func (r *MessageRepository) ListExpired(ctx context.Context, before time.Time, limit int) ([]*domain.Message, error) {
+	query := `
+		SELECT id, room_id, sender_id, content, message_type, ttl, destroy_after_read, created_at, expires_at
+		FROM messages
+		WHERE expires_at IS NOT NULL AND expires_at <= $1
+		ORDER BY expires_at ASC
+		LIMIT $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, before, limit)
 	if err != nil {
 		return nil, err
 	}

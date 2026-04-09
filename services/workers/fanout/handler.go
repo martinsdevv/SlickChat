@@ -34,6 +34,9 @@ func FanoutHandler(rdb *redis.Client) func(events.Event) {
 
 		case events.EventTypeMessageDeleted:
 			handleMessageDeleted(event, rdb)
+
+		case events.EventTypeMessageExpired:
+			handleMessageExpired(event, rdb)
 		}
 	}
 }
@@ -169,6 +172,25 @@ func handleMessageDeleted(event events.Event, rdb *redis.Client) {
 	ctx := context.Background()
 
 	var payload events.MessageDeleted
+	json.Unmarshal(event.Payload, &payload)
+
+	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()
+
+	eventBytes, _ := json.Marshal(event)
+
+	for _, userID := range members {
+		connections, _ := rdb.SMembers(ctx, "user_connections:"+userID).Result()
+
+		for _, connID := range connections {
+			rdb.Publish(ctx, "connection:"+connID, eventBytes)
+		}
+	}
+}
+
+func handleMessageExpired(event events.Event, rdb *redis.Client) {
+	ctx := context.Background()
+
+	var payload events.MessageExpired
 	json.Unmarshal(event.Payload, &payload)
 
 	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()

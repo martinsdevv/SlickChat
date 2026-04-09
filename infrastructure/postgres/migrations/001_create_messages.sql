@@ -12,3 +12,4 @@ CREATE TABLE messages (
 
 CREATE INDEX idx_messages_room_id ON messages(room_id);
 CREATE INDEX idx_messages_created_at ON messages(created_at);
+CREATE INDEX idx_messages_expires_at ON messages(expires_at);

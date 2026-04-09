@@ -18,10 +18,14 @@ func main() {
 	}
 
 	repo := postgres.NewMessageRepository(db)
+	roomRepo := postgres.NewRoomRepository(db)
+	membershipRepo := postgres.NewRoomMembershipRepository(db)
 
 	handler := api.NewMessageHandler(repo)
+	roomContextHandler := api.NewRoomContextHandler(roomRepo, membershipRepo)
 
 	http.HandleFunc("/messages", handler.GetMessages)
+	http.HandleFunc("/room-context", roomContextHandler.GetRoomContext)
 
 	port := ":8081"
 	log.Logger.Info("API running on port" + port)

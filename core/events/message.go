@@ -7,6 +7,7 @@ const (
 	EventTypeMessageDelivered = "message.delivered.v1"
 	EventTypeMessageRead      = "message.read.v1"
 	EventTypeMessageDeleted   = "message.deleted.v1"
+	EventTypeMessageExpired   = "message.expired.v1"
 )
 
 type MessageSent struct {
@@ -40,4 +41,10 @@ type MessageDeleted struct {
 	MessageID string    `json:"message_id"`
 	RoomID    string    `json:"room_id"`
 	DeletedAt time.Time `json:"deleted_at"`
+}
+
+type MessageExpired struct {
+	MessageID string    `json:"message_id"`
+	RoomID    string    `json:"room_id"`
+	ExpiredAt time.Time `json:"expired_at"`
 }
