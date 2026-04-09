@@ -27,6 +27,12 @@ func SendMessage(
 
 	messageID := uuid.New()
 
+	var expiresAt *time.Time
+	if room.TTL > 0 {
+		t := now.Add(time.Duration(room.TTL) * time.Second)
+		expiresAt = &t
+	}
+
 	payload := events.MessageSent{
 		MessageID:        messageID.String(),
 		RoomID:           room.ID.String(),
@@ -36,7 +42,7 @@ func SendMessage(
 		IsZeroLogging:    !room.CanPersistMessages(),
 		TTL:              room.TTL,
 		DestroyAfterRead: false,
-		ExpiresAt:        room.ExpiresAt,
+		ExpiresAt:        expiresAt,
 		SentAt:           now,
 	}
 

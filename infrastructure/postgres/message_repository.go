@@ -32,6 +32,7 @@ func (r *MessageRepository) Save(ctx context.Context, msg *domain.Message) error
 			expires_at
 		)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		ON CONFLICT (id) DO NOTHING
 	`
 
 	_, err := r.db.ExecContext(
@@ -49,6 +50,31 @@ func (r *MessageRepository) Save(ctx context.Context, msg *domain.Message) error
 	)
 
 	return err
+}
+
+func (r *MessageRepository) GetByID(ctx context.Context, messageID uuid.UUID) (*domain.Message, error) {
+	query := `
+		SELECT id, room_id, sender_id, content, message_type, ttl, destroy_after_read, created_at, expires_at
+		FROM messages
+		WHERE id = $1
+	`
+
+	var msg domain.Message
+	if err := r.db.QueryRowContext(ctx, query, messageID).Scan(
+		&msg.ID,
+		&msg.RoomID,
+		&msg.SenderID,
+		&msg.Content,
+		&msg.MessageType,
+		&msg.TTL,
+		&msg.DestroyAfterRead,
+		&msg.CreatedAt,
+		&msg.ExpiresAt,
+	); err != nil {
+		return nil, err
+	}
+
+	return &msg, nil
 }
 
 func (r *MessageRepository) ListByRoom(ctx context.Context, roomID uuid.UUID, limit int) ([]*domain.Message, error) {

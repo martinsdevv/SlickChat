@@ -19,6 +19,10 @@ type RoomContextHandler struct {
 	memberships contracts.RoomMembershipRepository
 }
 
+type MessageContextHandler struct {
+	repo contracts.MessageRepository
+}
+
 func NewMessageHandler(repo contracts.MessageRepository) *MessageHandler {
 	return &MessageHandler{repo: repo}
 }
@@ -28,6 +32,10 @@ func NewRoomContextHandler(rooms contracts.RoomRepository, memberships contracts
 		rooms:       rooms,
 		memberships: memberships,
 	}
+}
+
+func NewMessageContextHandler(repo contracts.MessageRepository) *MessageContextHandler {
+	return &MessageContextHandler{repo: repo}
 }
 
 func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
@@ -119,6 +127,44 @@ func (h *RoomContextHandler) GetRoomContext(w http.ResponseWriter, r *http.Reque
 		ZeroLogging:  room.ZeroLogging,
 		ExpiresAt:    room.ExpiresAt,
 		Role:         string(membership.Role),
+	}
+
+	json.NewEncoder(w).Encode(resp)
+}
+
+type MessageContextResponse struct {
+	MessageID        string     `json:"message_id"`
+	RoomID           string     `json:"room_id"`
+	SenderID         string     `json:"sender_id"`
+	DestroyAfterRead bool       `json:"destroy_after_read"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+}
+
+func (h *MessageContextHandler) GetMessageContext(w http.ResponseWriter, r *http.Request) {
+	rawMessageID := r.URL.Query().Get("message_id")
+	if rawMessageID == "" {
+		http.Error(w, "message_id required", http.StatusBadRequest)
+		return
+	}
+
+	messageID, err := uuid.Parse(rawMessageID)
+	if err != nil {
+		http.Error(w, "invalid message_id", http.StatusBadRequest)
+		return
+	}
+
+	msg, err := h.repo.GetByID(r.Context(), messageID)
+	if err != nil {
+		http.Error(w, "message not found", http.StatusNotFound)
+		return
+	}
+
+	resp := MessageContextResponse{
+		MessageID:        msg.ID.String(),
+		RoomID:           msg.RoomID.String(),
+		SenderID:         msg.SenderID.String(),
+		DestroyAfterRead: msg.DestroyAfterRead,
+		ExpiresAt:        msg.ExpiresAt,
 	}
 
 	json.NewEncoder(w).Encode(resp)

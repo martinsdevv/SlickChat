@@ -31,6 +31,14 @@ type roomContextResponse struct {
 	Role         string     `json:"role"`
 }
 
+type messageContextResponse struct {
+	MessageID        string     `json:"message_id"`
+	RoomID           string     `json:"room_id"`
+	SenderID         string     `json:"sender_id"`
+	DestroyAfterRead bool       `json:"destroy_after_read"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+}
+
 func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, userID string) (*domain.Room, *domain.RoomMembership, error) {
 	req, err := http.NewRequestWithContext(
 		ctx,
@@ -104,8 +112,51 @@ func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, use
 	return room, membership, nil
 }
 
+func fetchMessageContext(ctx context.Context, apiBaseURL string, messageID string) (*messageContextResponse, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		apiBaseURL+"/message-context?message_id="+messageID,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("message_context_failed")
+	}
+
+	var mc messageContextResponse
+	if err := json.NewDecoder(resp.Body).Decode(&mc); err != nil {
+		return nil, err
+	}
+
+	return &mc, nil
+}
+
 func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client *Client, userID string, payload SendMessagePayload) {
 	ctx := context.Background()
+
+	if payload.RoomID == "" || payload.Content == "" {
+		sendError(client, "invalid_payload")
+		return
+	}
+	if _, err := uuid.Parse(payload.RoomID); err != nil {
+		sendError(client, "invalid_room_id")
+		return
+	}
+	if len(payload.Content) > 2000 {
+		sendError(client, "content_too_long")
+		return
+	}
 
 	room, membership, err := fetchRoomContext(ctx, "http://localhost:8081", payload.RoomID, userID)
 	if err != nil {
@@ -134,6 +185,7 @@ func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client 
 
 	rdb.HSet(ctx, "message:"+messageID, map[string]interface{}{
 		"sender_id": userID,
+		// futuro: destroy_after_read, expires_at, etc.
 	})
 
 	rdb.Expire(ctx, "message:"+messageID, time.Hour*24)
@@ -225,6 +277,16 @@ func handleDeleteMessage(
 	}
 
 	ctx := context.Background()
+
+	if _, err := uuid.Parse(payload.RoomID); err != nil {
+		sendError(client, "invalid_room_id")
+		return
+	}
+	if _, err := uuid.Parse(payload.MessageID); err != nil {
+		sendError(client, "invalid_message_id")
+		return
+	}
+
 	room, membership, err := fetchRoomContext(ctx, "http://localhost:8081", payload.RoomID, userID)
 	if err != nil {
 		if err.Error() == "not_in_room" {
@@ -236,9 +298,22 @@ func handleDeleteMessage(
 		return
 	}
 
-	messageUUID, err := uuid.Parse(payload.MessageID)
+	mc, err := fetchMessageContext(ctx, "http://localhost:8081", payload.MessageID)
 	if err != nil {
-		sendError(client, "invalid_message_id")
+		log.Logger.Error("message context failed", "error", err)
+		sendError(client, "delete_failed")
+		return
+	}
+
+	if mc.RoomID != payload.RoomID {
+		sendError(client, "delete_failed")
+		return
+	}
+
+	messageUUID := uuid.MustParse(payload.MessageID)
+	senderUUID, err := uuid.Parse(mc.SenderID)
+	if err != nil {
+		sendError(client, "delete_failed")
 		return
 	}
 
@@ -248,7 +323,7 @@ func handleDeleteMessage(
 		membership,
 		userUUID,
 		messageUUID,
-		userUUID, // TEMP
+		senderUUID,
 	)
 
 	if err != nil {

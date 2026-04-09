@@ -23,9 +23,11 @@ func main() {
 
 	handler := api.NewMessageHandler(repo)
 	roomContextHandler := api.NewRoomContextHandler(roomRepo, membershipRepo)
+	messageContextHandler := api.NewMessageContextHandler(repo)
 
 	http.HandleFunc("/messages", handler.GetMessages)
 	http.HandleFunc("/room-context", roomContextHandler.GetRoomContext)
+	http.HandleFunc("/message-context", messageContextHandler.GetMessageContext)
 
 	port := ":8081"
 	log.Logger.Info("API running on port" + port)
