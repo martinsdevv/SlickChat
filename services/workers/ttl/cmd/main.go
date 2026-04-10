@@ -18,7 +18,7 @@ func main() {
 
 	db, err := postgres.NewConnection(dsn)
 	if err != nil {
-		log.Logger.Error("failed to connect to postgres", err)
+		log.Logger.Error("failed to connect to postgres", "error", err)
 		os.Exit(1)
 	}
 

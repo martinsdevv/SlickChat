@@ -18,7 +18,7 @@ func Run(ctx context.Context, repo contracts.MessageRepository, producer *kafkai
 		now := time.Now().UTC()
 		msgs, err := repo.ListExpired(ctx, now, batchSize)
 		if err != nil {
-			log.Logger.Error("list expired messages", err)
+			log.Logger.Error("list expired messages", "error", err)
 			return
 		}
 
@@ -27,7 +27,7 @@ func Run(ctx context.Context, repo contracts.MessageRepository, producer *kafkai
 				continue
 			}
 			if err := application.PublishMessageExpired(producer, m.ID, m.RoomID, *m.ExpiresAt); err != nil {
-				log.Logger.Error("publish message expired", err, "message_id", m.ID)
+				log.Logger.Error("publish message expired", "error", err, "message_id", m.ID)
 			}
 		}
 	}

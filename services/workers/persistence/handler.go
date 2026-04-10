@@ -101,7 +101,7 @@ func (h *Handler) handleMessageSent(event events.Event) {
 
 	n, err := h.repo.Save(context.Background(), msg)
 	if err != nil {
-		log.Logger.Error("failed to persist message", err, "message_id:", msg.ID)
+		log.Logger.Error("failed to persist message", "error", err, "message_id", msg.ID)
 		return
 	}
 	if n == 0 {

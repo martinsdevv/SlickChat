@@ -240,7 +240,7 @@ func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client 
 		payload.Content,
 	); err != nil {
 		_ = rdb.Del(ctx, msgKey).Err()
-		log.Logger.Error("Erro ao enviar mensagem: ", err)
+		log.Logger.Error("Erro ao enviar mensagem", "error", err)
 		sendError(client, "internal_error")
 		return
 	}

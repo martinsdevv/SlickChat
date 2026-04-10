@@ -62,7 +62,7 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Logger.Info("erro no upgrade:", err)
+			log.Logger.Info("erro no upgrade", "error", err)
 			return
 		}
 
@@ -137,7 +137,7 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 				var payload MessageDeletePayload
 				err := json.Unmarshal(msg.Payload, &payload)
 				if err != nil {
-					log.Logger.Error("error in the payload:", err)
+					log.Logger.Error("error in the payload", "error", err)
 				}
 
 				handleDeleteMessage(rdb, producer, client, userID, payload)

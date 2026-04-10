@@ -2,24 +2,39 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/martinsdevv/slickchat/core/domain"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestMessageRepository_Save(t *testing.T) {
-	dsn := "postgres://postgres:postgres@localhost:5432/slickchat?sslmode=disable"
-
-	db, err := NewConnection(dsn)
-	if err != nil {
-		t.Fatalf("failed to connect db: %v", err)
+func postgresDSN() string {
+	if d := os.Getenv("POSTGRES_TEST_DSN"); d != "" {
+		return d
 	}
+	return "postgres://postgres:postgres@localhost:5432/slickchat?sslmode=disable"
+}
 
-	defer db.Close()
+func openRepoOrSkip(t *testing.T) (repo *MessageRepository, db *sql.DB, cleanup func()) {
+	t.Helper()
+	var err error
+	db, err = NewConnection(postgresDSN())
+	if err != nil {
+		t.Skipf("postgres indisponível: %v", err)
+	}
+	cleanup = func() { _ = db.Close() }
+	repo = NewMessageRepository(db).(*MessageRepository)
+	return repo, db, cleanup
+}
 
-	repo := NewMessageRepository(db)
+func TestMessageRepository_Save(t *testing.T) {
+	repo, db, cleanup := openRepoOrSkip(t)
+	defer cleanup()
 
 	msg := &domain.Message{
 		ID:          uuid.New(),
@@ -32,27 +47,42 @@ func TestMessageRepository_Save(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		db.Exec("DELETE FROM messages WHERE id = $1", msg.ID)
+		_, _ = db.Exec("DELETE FROM messages WHERE id = $1", msg.ID)
 	})
 
 	n, err := repo.Save(context.Background(), msg)
-	if err != nil {
-		t.Fatalf("failed to save message: %v", err)
-	}
-	if n != 1 {
-		t.Fatalf("expected 1 row inserted, got %d", n)
-	}
-
-	row := db.QueryRow("SELECT content FROM messages WHERE id = $1", msg.ID)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n)
 
 	var content string
-	err = row.Scan(&content)
+	err = db.QueryRow("SELECT content FROM messages WHERE id = $1", msg.ID).Scan(&content)
+	require.NoError(t, err)
+	assert.Equal(t, "hello test", content)
+}
 
-	if err != nil {
-		t.Fatalf("failed to query message: %v", err)
+func TestMessageRepository_Save_duplicateReturnsZero(t *testing.T) {
+	repo, db, cleanup := openRepoOrSkip(t)
+	defer cleanup()
+
+	msg := &domain.Message{
+		ID:          uuid.New(),
+		RoomID:      uuid.New(),
+		SenderID:    uuid.New(),
+		Content:     "dup test",
+		MessageType: "TEXT",
+		TTL:         0,
+		CreatedAt:   time.Now(),
 	}
 
-	if content != "hello test" {
-		t.Fatalf("unexpected content: %s", content)
-	}
+	t.Cleanup(func() {
+		_, _ = db.Exec("DELETE FROM messages WHERE id = $1", msg.ID)
+	})
+
+	n1, err := repo.Save(context.Background(), msg)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n1)
+
+	n2, err := repo.Save(context.Background(), msg)
+	require.NoError(t, err)
+	assert.Zero(t, n2, "ON CONFLICT DO NOTHING deve retornar 0 linhas")
 }

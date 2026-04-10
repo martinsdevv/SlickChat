@@ -78,7 +78,7 @@ func (r *Room) CanDeleteMessage(
 	}
 
 	// ou moderador/admin
-	if membership.CanModerate() {
+	if membership != nil && membership.CanModerate() {
 		return nil
 	}
 
