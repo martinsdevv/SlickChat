@@ -27,6 +27,7 @@ type MessageDelivered struct {
 	MessageID   string    `json:"message_id"`
 	RoomID      string    `json:"room_id"`
 	UserID      string    `json:"user_id"`
+	SenderID    string    `json:"sender_id,omitempty"`
 	DeliveredAt time.Time `json:"delivered_at"`
 }
 
@@ -34,6 +35,7 @@ type MessageRead struct {
 	MessageID string    `json:"message_id"`
 	RoomID    string    `json:"room_id"`
 	UserID    string    `json:"user_id"`
+	SenderID  string    `json:"sender_id,omitempty"`
 	ReadAt    time.Time `json:"read_at"`
 }
 

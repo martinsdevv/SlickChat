@@ -10,7 +10,7 @@ import (
 
 func DeliverMessage(
 	producer *kafkainfra.Producer,
-	userID, roomID, messageID string,
+	userID, roomID, messageID, senderID string,
 ) error {
 
 	now := time.Now().UTC()
@@ -19,6 +19,7 @@ func DeliverMessage(
 		MessageID:   messageID,
 		RoomID:      roomID,
 		UserID:      userID,
+		SenderID:    senderID,
 		DeliveredAt: now,
 	}
 

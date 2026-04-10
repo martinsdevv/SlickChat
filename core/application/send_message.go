@@ -17,15 +17,28 @@ func SendMessage(
 	userID uuid.UUID,
 	content string,
 ) (string, error) {
+	id := uuid.New()
+	if err := SendMessageWithID(producer, room, membership, userID, id, content); err != nil {
+		return "", err
+	}
+	return id.String(), nil
+}
+
+// SendMessageWithID publica MessageSent com o id fornecido (ex.: após gravar sender_id no Redis no gateway).
+func SendMessageWithID(
+	producer *kafkainfra.Producer,
+	room *domain.Room,
+	membership *domain.RoomMembership,
+	userID uuid.UUID,
+	messageID uuid.UUID,
+	content string,
+) error {
 
 	now := time.Now().UTC()
 
-	// valida domínio
 	if err := room.CanUserSendMessage(userID, membership.Role, now); err != nil {
-		return "", err
+		return err
 	}
-
-	messageID := uuid.New()
 
 	var expiresAt *time.Time
 	if room.TTL > 0 {
@@ -52,12 +65,8 @@ func SendMessage(
 		payload,
 	)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	if err := producer.Publish(context.Background(), event); err != nil {
-		return messageID.String(), err
-	}
-
-	return messageID.String(), nil
+	return producer.Publish(context.Background(), event)
 }

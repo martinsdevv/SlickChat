@@ -8,11 +8,12 @@ import (
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 )
 
-func ReadMessage(producer *kafkainfra.Producer, userID, roomID, messageID string) error {
+func ReadMessage(producer *kafkainfra.Producer, userID, roomID, messageID, senderID string) error {
 	payload := events.MessageRead{
 		MessageID: messageID,
 		RoomID:    roomID,
 		UserID:    userID,
+		SenderID:  senderID,
 		ReadAt:    time.Now().UTC(),
 	}
 

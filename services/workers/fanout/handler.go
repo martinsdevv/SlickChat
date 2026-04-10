@@ -69,7 +69,7 @@ func handleMessageDelivered(event events.Event, rdb *redis.Client) {
 		return
 	}
 
-	senderID := getMessageSender(rdb, payload.MessageID)
+	senderID := resolveSender(payload.SenderID, payload.MessageID, rdb)
 	if senderID == "" {
 		return
 	}
@@ -163,7 +163,7 @@ func handleMessageRead(event events.Event, rdb *redis.Client) {
 		return
 	}
 
-	senderID := getMessageSender(rdb, payload.MessageID)
+	senderID := resolveSender(payload.SenderID, payload.MessageID, rdb)
 	if senderID == "" {
 		// Mensagem já removida do Redis (delete/expire) ou nunca existiu — ignora read fora de ordem.
 		return
@@ -207,6 +207,14 @@ func getMessageSender(rdb *redis.Client, messageID string) string {
 	}
 
 	return val
+}
+
+// resolveSender usa o payload do evento quando presente (evita corrida com Redis).
+func resolveSender(payloadSenderID, messageID string, rdb *redis.Client) string {
+	if payloadSenderID != "" {
+		return payloadSenderID
+	}
+	return getMessageSender(rdb, messageID)
 }
 
 func isUserInRoom(rdb *redis.Client, userID, roomID string) bool {

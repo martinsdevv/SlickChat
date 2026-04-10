@@ -150,6 +150,8 @@ func subscribeConnection(rdb *redis.Client, connectionID string) {
 	ctx := context.Background()
 
 	pubsub := rdb.Subscribe(ctx, "connection:"+connectionID)
+	defer pubsub.Close()
+
 	ch := pubsub.Channel()
 
 	for msg := range ch {

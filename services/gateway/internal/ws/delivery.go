@@ -76,25 +76,13 @@ func getHTTP(ctx context.Context, url string) (*http.Response, error) {
 	return nil, lastErr
 }
 
-func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, userID string) (*domain.Room, *domain.RoomMembership, error) {
-	resp, err := getHTTP(ctx, apiBaseURL+"/room-context?room_id="+roomID+"&user_id="+userID)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer resp.Body.Close()
+const roomContextCacheTTL = 30 * time.Second
 
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound {
-			return nil, nil, errors.New("not_in_room")
-		}
-		return nil, nil, errors.New("room_context_failed")
-	}
+func roomContextCacheKey(roomID, userID string) string {
+	return "room_context:" + roomID + ":" + userID
+}
 
-	var rc roomContextResponse
-	if err := json.NewDecoder(resp.Body).Decode(&rc); err != nil {
-		return nil, nil, err
-	}
-
+func roomFromContextResponse(rc roomContextResponse, userID string) (*domain.Room, *domain.RoomMembership, error) {
 	roomUUID, err := uuid.Parse(rc.RoomID)
 	if err != nil {
 		return nil, nil, err
@@ -103,7 +91,6 @@ func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, use
 	rt := domain.RoomType(rc.Type)
 	switch rt {
 	case domain.RoomTypePublic, domain.RoomTypePrivate, domain.RoomTypeDirect, domain.RoomTypeTemporary:
-		// ok
 	default:
 		return nil, nil, errors.New("invalid_room_type")
 	}
@@ -111,7 +98,6 @@ func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, use
 	role := domain.Role(rc.Role)
 	switch role {
 	case domain.RoleAdmin, domain.RoleModerator, domain.RoleMember:
-		// ok
 	default:
 		return nil, nil, errors.New("invalid_role")
 	}
@@ -143,6 +129,44 @@ func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, use
 	}
 
 	return room, membership, nil
+}
+
+func fetchRoomContext(ctx context.Context, rdb *redis.Client, apiBaseURL string, roomID string, userID string) (*domain.Room, *domain.RoomMembership, error) {
+	cacheKey := roomContextCacheKey(roomID, userID)
+	if rdb != nil {
+		if b, err := rdb.Get(ctx, cacheKey).Bytes(); err == nil {
+			var rc roomContextResponse
+			if json.Unmarshal(b, &rc) == nil {
+				return roomFromContextResponse(rc, userID)
+			}
+		}
+	}
+
+	resp, err := getHTTP(ctx, apiBaseURL+"/room-context?room_id="+roomID+"&user_id="+userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound {
+			return nil, nil, errors.New("not_in_room")
+		}
+		return nil, nil, errors.New("room_context_failed")
+	}
+
+	var rc roomContextResponse
+	if err := json.NewDecoder(resp.Body).Decode(&rc); err != nil {
+		return nil, nil, err
+	}
+
+	if rdb != nil {
+		if raw, err := json.Marshal(rc); err == nil {
+			_ = rdb.Set(ctx, cacheKey, raw, roomContextCacheTTL).Err()
+		}
+	}
+
+	return roomFromContextResponse(rc, userID)
 }
 
 func fetchMessageContext(ctx context.Context, apiBaseURL string, messageID string) (*messageContextResponse, error) {
@@ -180,7 +204,12 @@ func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client 
 		return
 	}
 
-	room, membership, err := fetchRoomContext(ctx, "http://localhost:8081", payload.RoomID, userID)
+	if !wsRateAllowed(rdb, userID, "send", 45) {
+		sendError(client, "rate_limited")
+		return
+	}
+
+	room, membership, err := fetchRoomContext(ctx, rdb, "http://localhost:8081", payload.RoomID, userID)
 	if err != nil {
 		if err.Error() == "not_in_room" {
 			sendError(client, "not_in_room")
@@ -191,26 +220,30 @@ func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client 
 		return
 	}
 
-	messageID, err := application.SendMessage(
+	messageID := uuid.New()
+	msgKey := "message:" + messageID.String()
+	if err := rdb.HSet(ctx, msgKey, map[string]interface{}{
+		"sender_id": userID,
+	}).Err(); err != nil {
+		log.Logger.Error("redis hset message", "error", err)
+		sendError(client, "internal_error")
+		return
+	}
+	_ = rdb.Expire(ctx, msgKey, time.Hour*24).Err()
+
+	if err := application.SendMessageWithID(
 		producer,
 		room,
 		membership,
 		uuid.MustParse(userID),
+		messageID,
 		payload.Content,
-	)
-
-	if err != nil {
+	); err != nil {
+		_ = rdb.Del(ctx, msgKey).Err()
 		log.Logger.Error("Erro ao enviar mensagem: ", err)
 		sendError(client, "internal_error")
 		return
 	}
-
-	rdb.HSet(ctx, "message:"+messageID, map[string]interface{}{
-		"sender_id": userID,
-		// futuro: destroy_after_read, expires_at, etc.
-	})
-
-	rdb.Expire(ctx, "message:"+messageID, time.Hour*24)
 
 	sendAck(client)
 }
@@ -222,12 +255,20 @@ func handleMessageDelivered(
 	userID string,
 	payload MessageDeliveredPayload,
 ) {
+	if !wsRateAllowed(rdb, userID, "delivered", 120) {
+		sendError(client, "rate_limited")
+		return
+	}
+
 	if !isUserInRoom(rdb, userID, payload.RoomID) {
 		sendError(client, "not_in_room")
 		return
 	}
 
-	application.DeliverMessage(producer, userID, payload.RoomID, payload.MessageID)
+	ctx := context.Background()
+	senderID, _ := rdb.HGet(ctx, "message:"+payload.MessageID, "sender_id").Result()
+
+	application.DeliverMessage(producer, userID, payload.RoomID, payload.MessageID, senderID)
 }
 
 func sendToConnection(connectionID, msgType string, payload interface{}) {
@@ -272,6 +313,11 @@ func handleMessageRead(
 	userID string,
 	payload MessageReadPayload,
 ) {
+	if !wsRateAllowed(rdb, userID, "read", 120) {
+		sendError(client, "rate_limited")
+		return
+	}
+
 	if !isUserInRoom(rdb, userID, payload.RoomID) {
 		sendError(client, "not_in_room")
 		return
@@ -286,9 +332,11 @@ func handleMessageRead(
 		return
 	}
 
-	_ = application.ReadMessage(producer, userID, payload.RoomID, payload.MessageID)
-
 	ctx := context.Background()
+	senderID, _ := rdb.HGet(ctx, "message:"+payload.MessageID, "sender_id").Result()
+
+	_ = application.ReadMessage(producer, userID, payload.RoomID, payload.MessageID, senderID)
+
 	mc, err := fetchMessageContext(ctx, "http://localhost:8081", payload.MessageID)
 	if err != nil {
 		// read já foi publicado; falha de auto-delete não pode derrubar a sessão
@@ -323,6 +371,11 @@ func handleDeleteMessage(
 
 	ctx := context.Background()
 
+	if !wsRateAllowed(rdb, userID, "delete", 25) {
+		sendError(client, "rate_limited")
+		return
+	}
+
 	if _, err := uuid.Parse(payload.RoomID); err != nil {
 		sendError(client, "invalid_room_id")
 		return
@@ -332,7 +385,7 @@ func handleDeleteMessage(
 		return
 	}
 
-	room, membership, err := fetchRoomContext(ctx, "http://localhost:8081", payload.RoomID, userID)
+	room, membership, err := fetchRoomContext(ctx, rdb, "http://localhost:8081", payload.RoomID, userID)
 	if err != nil {
 		if err.Error() == "not_in_room" {
 			sendError(client, "not_in_room")
