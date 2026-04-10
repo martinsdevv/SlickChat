@@ -146,7 +146,8 @@ func handleMessageRead(event events.Event, rdb *redis.Client) {
 		return
 	}
 
-	rdb.Del(ctx, "user:"+payload.UserID+":room:"+payload.RoomID+":unread")
+	// Uma mensagem lida: decrementa 1 (não apaga a chave — DEL deixava GET = nil).
+	decrUnreadClamp0(rdb, payload.UserID, payload.RoomID)
 
 	connections, _ := rdb.SMembers(ctx, "user_connections:"+senderID).Result()
 
