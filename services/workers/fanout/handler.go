@@ -6,8 +6,21 @@ import (
 	"time"
 
 	"github.com/martinsdevv/slickchat/core/events"
+	"github.com/martinsdevv/slickchat/infrastructure/log"
 	"github.com/redis/go-redis/v9"
 )
+
+const fanoutDedupeTTL = 72 * time.Hour
+
+// fanoutDedupe garante efeito colateral do fanout uma vez por (tipo, message_id) — replay Kafka não duplica WS/unread.
+func fanoutDedupe(ctx context.Context, rdb *redis.Client, kind, messageID string) bool {
+	if messageID == "" {
+		return false
+	}
+	key := "fanout:dedupe:" + kind + ":" + messageID
+	ok, err := rdb.SetNX(ctx, key, "1", fanoutDedupeTTL).Result()
+	return err == nil && ok
+}
 
 type MessageDeliveredWithCount struct {
 	events.MessageDelivered
@@ -45,7 +58,15 @@ func handleMessageDelivered(event events.Event, rdb *redis.Client) {
 	ctx := context.Background()
 
 	var payload events.MessageDelivered
-	json.Unmarshal(event.Payload, &payload)
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Logger.Warn("fanout poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
+		return
+	}
+
+	senderID := getMessageSender(rdb, payload.MessageID)
+	if senderID == "" {
+		return
+	}
 
 	key := "msg:" + payload.MessageID + ":delivered"
 
@@ -57,11 +78,6 @@ func handleMessageDelivered(event events.Event, rdb *redis.Client) {
 
 	// TTL
 	rdb.Expire(ctx, key, 24*time.Hour)
-
-	senderID := getMessageSender(rdb, payload.MessageID)
-	if senderID == "" {
-		return
-	}
 
 	connections, _ := rdb.SMembers(ctx, "user_connections:"+senderID).Result()
 
@@ -85,7 +101,14 @@ func handleMessageSent(event events.Event, rdb *redis.Client) {
 	ctx := context.Background()
 
 	var payload events.MessageSent
-	json.Unmarshal(event.Payload, &payload)
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Logger.Warn("fanout poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
+		return
+	}
+
+	if !fanoutDedupe(ctx, rdb, "sent", payload.MessageID) {
+		return
+	}
 
 	rdb.Expire(ctx, "msg:"+payload.MessageID+":delivered", 24*time.Hour)
 	rdb.Expire(ctx, "msg:"+payload.MessageID+":read", 24*time.Hour)
@@ -129,7 +152,16 @@ func handleMessageRead(event events.Event, rdb *redis.Client) {
 	ctx := context.Background()
 
 	var payload events.MessageRead
-	json.Unmarshal(event.Payload, &payload)
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Logger.Warn("fanout poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
+		return
+	}
+
+	senderID := getMessageSender(rdb, payload.MessageID)
+	if senderID == "" {
+		// Mensagem já removida do Redis (delete/expire) ou nunca existiu — ignora read fora de ordem.
+		return
+	}
 
 	key := "msg:" + payload.MessageID + ":read"
 
@@ -140,11 +172,6 @@ func handleMessageRead(event events.Event, rdb *redis.Client) {
 	}
 
 	rdb.Expire(ctx, key, 24*time.Hour)
-
-	senderID := getMessageSender(rdb, payload.MessageID)
-	if senderID == "" {
-		return
-	}
 
 	// Uma mensagem lida: decrementa 1 (não apaga a chave — DEL deixava GET = nil).
 	decrUnreadClamp0(rdb, payload.UserID, payload.RoomID)
@@ -191,7 +218,14 @@ func handleMessageDeleted(event events.Event, rdb *redis.Client) {
 	ctx := context.Background()
 
 	var payload events.MessageDeleted
-	json.Unmarshal(event.Payload, &payload)
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Logger.Warn("fanout poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
+		return
+	}
+
+	if !fanoutDedupe(ctx, rdb, "deleted", payload.MessageID) {
+		return
+	}
 
 	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()
 	senderID := getMessageSender(rdb, payload.MessageID)
@@ -209,13 +243,22 @@ func handleMessageDeleted(event events.Event, rdb *redis.Client) {
 			rdb.Publish(ctx, "connection:"+connID, eventBytes)
 		}
 	}
+
+	rdb.Del(ctx, "message:"+payload.MessageID)
 }
 
 func handleMessageExpired(event events.Event, rdb *redis.Client) {
 	ctx := context.Background()
 
 	var payload events.MessageExpired
-	json.Unmarshal(event.Payload, &payload)
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Logger.Warn("fanout poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
+		return
+	}
+
+	if !fanoutDedupe(ctx, rdb, "expired", payload.MessageID) {
+		return
+	}
 
 	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()
 	senderID := getMessageSender(rdb, payload.MessageID)
@@ -233,4 +276,6 @@ func handleMessageExpired(event events.Event, rdb *redis.Client) {
 			rdb.Publish(ctx, "connection:"+connID, eventBytes)
 		}
 	}
+
+	rdb.Del(ctx, "message:"+payload.MessageID)
 }

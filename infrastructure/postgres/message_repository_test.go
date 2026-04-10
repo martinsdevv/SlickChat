@@ -35,9 +35,12 @@ func TestMessageRepository_Save(t *testing.T) {
 		db.Exec("DELETE FROM messages WHERE id = $1", msg.ID)
 	})
 
-	err = repo.Save(context.Background(), msg)
+	n, err := repo.Save(context.Background(), msg)
 	if err != nil {
 		t.Fatalf("failed to save message: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("expected 1 row inserted, got %d", n)
 	}
 
 	row := db.QueryRow("SELECT content FROM messages WHERE id = $1", msg.ID)

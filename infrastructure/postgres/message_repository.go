@@ -18,7 +18,7 @@ func NewMessageRepository(db *sql.DB) contracts.MessageRepository {
 	return &MessageRepository{db: db}
 }
 
-func (r *MessageRepository) Save(ctx context.Context, msg *domain.Message) error {
+func (r *MessageRepository) Save(ctx context.Context, msg *domain.Message) (int64, error) {
 	query := `
 		INSERT INTO messages (
 			id,
@@ -35,7 +35,7 @@ func (r *MessageRepository) Save(ctx context.Context, msg *domain.Message) error
 		ON CONFLICT (id) DO NOTHING
 	`
 
-	_, err := r.db.ExecContext(
+	res, err := r.db.ExecContext(
 		ctx,
 		query,
 		msg.ID,
@@ -48,8 +48,14 @@ func (r *MessageRepository) Save(ctx context.Context, msg *domain.Message) error
 		msg.CreatedAt,
 		msg.ExpiresAt,
 	)
-
-	return err
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 func (r *MessageRepository) GetByID(ctx context.Context, messageID uuid.UUID) (*domain.Message, error) {
@@ -170,9 +176,12 @@ func (r *MessageRepository) ListExpired(ctx context.Context, before time.Time, l
 	return messages, nil
 }
 
-func (r *MessageRepository) Delete(ctx context.Context, messageID uuid.UUID) error {
+func (r *MessageRepository) Delete(ctx context.Context, messageID uuid.UUID) (int64, error) {
 	query := `DELETE FROM messages WHERE id = $1`
 
-	_, err := r.db.ExecContext(ctx, query, messageID)
-	return err
+	res, err := r.db.ExecContext(ctx, query, messageID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }

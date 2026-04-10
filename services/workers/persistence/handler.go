@@ -40,6 +40,7 @@ func (h *Handler) Handle(event events.Event) {
 	default:
 		log.Logger.Warn("unknown event type",
 			"event_type", event.EventType,
+			"event_id", event.EventID,
 		)
 	}
 }
@@ -48,7 +49,7 @@ func (h *Handler) handleMessageSent(event events.Event) {
 	var payload events.MessageSent
 
 	if err := json.Unmarshal(event.Payload, &payload); err != nil {
-		log.Logger.Error("failed to unmarshal payload", err)
+		log.Logger.Warn("persistence poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
 		return
 	}
 
@@ -60,19 +61,19 @@ func (h *Handler) handleMessageSent(event events.Event) {
 
 	id, err := uuid.Parse(payload.MessageID)
 	if err != nil {
-		log.Logger.Error("invalid message id", "error", err)
+		log.Logger.Warn("persistence poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
 		return
 	}
 
 	roomID, err := uuid.Parse(payload.RoomID)
 	if err != nil {
-		log.Logger.Error("invalid room id", "error", err)
+		log.Logger.Warn("persistence poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
 		return
 	}
 
 	senderID, err := uuid.Parse(payload.SenderID)
 	if err != nil {
-		log.Logger.Error("invalid sender id", "error", err)
+		log.Logger.Warn("persistence poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
 		return
 	}
 
@@ -95,8 +96,13 @@ func (h *Handler) handleMessageSent(event events.Event) {
 		DestroyAfterRead: payload.DestroyAfterRead,
 	}
 
-	if err := h.repo.Save(context.Background(), msg); err != nil {
+	n, err := h.repo.Save(context.Background(), msg)
+	if err != nil {
 		log.Logger.Error("failed to persist message", err, "message_id:", msg.ID)
+		return
+	}
+	if n == 0 {
+		log.Logger.Info("message persist skipped duplicate", "message_id", msg.ID)
 		return
 	}
 
@@ -107,18 +113,23 @@ func (h *Handler) handleMessageDeleted(event events.Event) {
 	var payload events.MessageDeleted
 
 	if err := json.Unmarshal(event.Payload, &payload); err != nil {
-		log.Logger.Error("failed to unmarshal payload", "error", err)
+		log.Logger.Warn("persistence poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
 		return
 	}
 
 	id, err := uuid.Parse(payload.MessageID)
 	if err != nil {
-		log.Logger.Error("invalid message id", "error", err)
+		log.Logger.Warn("persistence poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
 		return
 	}
 
-	if err := h.repo.Delete(context.Background(), id); err != nil {
+	n, err := h.repo.Delete(context.Background(), id)
+	if err != nil {
 		log.Logger.Error("failed to delete message", "error", err)
+		return
+	}
+	if n == 0 {
+		log.Logger.Info("message delete noop already gone", "message_id", payload.MessageID)
 		return
 	}
 
@@ -129,18 +140,23 @@ func (h *Handler) handleMessageExpired(event events.Event) {
 	var payload events.MessageExpired
 
 	if err := json.Unmarshal(event.Payload, &payload); err != nil {
-		log.Logger.Error("failed to unmarshal payload", "error", err)
+		log.Logger.Warn("persistence poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
 		return
 	}
 
 	id, err := uuid.Parse(payload.MessageID)
 	if err != nil {
-		log.Logger.Error("invalid message id", "error", err)
+		log.Logger.Warn("persistence poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
 		return
 	}
 
-	if err := h.repo.Delete(context.Background(), id); err != nil {
+	n, err := h.repo.Delete(context.Background(), id)
+	if err != nil {
 		log.Logger.Error("failed to delete expired message", "error", err)
+		return
+	}
+	if n == 0 {
+		log.Logger.Info("message expired noop already gone", "message_id", payload.MessageID)
 		return
 	}
 

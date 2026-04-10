@@ -40,19 +40,44 @@ type messageContextResponse struct {
 	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
 }
 
-func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, userID string) (*domain.Room, *domain.RoomMembership, error) {
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		apiBaseURL+"/room-context?room_id="+roomID+"&user_id="+userID,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
+// getHTTP faz GET com retry em falha de rede ou 5xx/429 (API local pode oscilar sob carga).
+func getHTTP(ctx context.Context, url string) (*http.Response, error) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	var lastErr error
+	backoff := 80 * time.Millisecond
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(backoff):
+			}
+			backoff *= 2
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			resp.Body.Close()
+			lastErr = errors.New("retryable http status")
+			continue
+		}
+		return resp, nil
 	}
+	if lastErr == nil {
+		lastErr = errors.New("http get failed")
+	}
+	return nil, lastErr
+}
 
-	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Do(req)
+func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, userID string) (*domain.Room, *domain.RoomMembership, error) {
+	resp, err := getHTTP(ctx, apiBaseURL+"/room-context?room_id="+roomID+"&user_id="+userID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -121,18 +146,7 @@ func fetchRoomContext(ctx context.Context, apiBaseURL string, roomID string, use
 }
 
 func fetchMessageContext(ctx context.Context, apiBaseURL string, messageID string) (*messageContextResponse, error) {
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		apiBaseURL+"/message-context?message_id="+messageID,
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := getHTTP(ctx, apiBaseURL+"/message-context?message_id="+messageID)
 	if err != nil {
 		return nil, err
 	}
