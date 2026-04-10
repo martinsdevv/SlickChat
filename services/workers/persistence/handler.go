@@ -37,6 +37,9 @@ func (h *Handler) Handle(event events.Event) {
 	case events.EventTypeMessageExpired:
 		h.handleMessageExpired(event)
 
+	case events.EventTypeUserJoinedRoom, events.EventTypeUserLeftRoom:
+		// Postgres já foi atualizado pela API; fanout sincroniza Redis.
+
 	default:
 		log.Logger.Warn("unknown event type",
 			"event_type", event.EventType,

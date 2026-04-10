@@ -13,4 +13,6 @@ type RoomRepository interface {
 
 type RoomMembershipRepository interface {
 	Get(ctx context.Context, roomID uuid.UUID, userID uuid.UUID) (*domain.RoomMembership, error)
+	Add(ctx context.Context, roomID uuid.UUID, userID uuid.UUID, role domain.Role) error
+	Remove(ctx context.Context, roomID uuid.UUID, userID uuid.UUID) error
 }

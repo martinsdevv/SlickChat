@@ -50,6 +50,12 @@ func FanoutHandler(rdb *redis.Client) func(events.Event) {
 
 		case events.EventTypeMessageExpired:
 			handleMessageExpired(event, rdb)
+
+		case events.EventTypeUserJoinedRoom:
+			handleUserJoinedRoom(event, rdb)
+
+		case events.EventTypeUserLeftRoom:
+			handleUserLeftRoom(event, rdb)
 		}
 	}
 }
@@ -278,4 +284,36 @@ func handleMessageExpired(event events.Event, rdb *redis.Client) {
 	}
 
 	rdb.Del(ctx, "message:"+payload.MessageID)
+}
+
+func handleUserJoinedRoom(event events.Event, rdb *redis.Client) {
+	ctx := context.Background()
+
+	var payload events.UserJoinedRoom
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Logger.Warn("fanout poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
+		return
+	}
+
+	if payload.RoomID == "" || payload.UserID == "" {
+		return
+	}
+
+	rdb.SAdd(ctx, "room_members:"+payload.RoomID, payload.UserID)
+}
+
+func handleUserLeftRoom(event events.Event, rdb *redis.Client) {
+	ctx := context.Background()
+
+	var payload events.UserLeftRoom
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Logger.Warn("fanout poison payload", "event_type", event.EventType, "event_id", event.EventID, "error", err)
+		return
+	}
+
+	if payload.RoomID == "" || payload.UserID == "" {
+		return
+	}
+
+	rdb.SRem(ctx, "room_members:"+payload.RoomID, payload.UserID)
 }

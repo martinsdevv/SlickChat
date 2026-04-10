@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/martinsdevv/slickchat/core/contracts"
@@ -46,5 +47,27 @@ func (r *RoomMembershipRepository) Get(ctx context.Context, roomID uuid.UUID, us
 		UserID: rawUserID,
 		Role:   role,
 	}, nil
+}
+
+func (r *RoomMembershipRepository) Add(ctx context.Context, roomID uuid.UUID, userID uuid.UUID, role domain.Role) error {
+	switch role {
+	case domain.RoleAdmin, domain.RoleModerator, domain.RoleMember:
+	default:
+		return errors.New("invalid role")
+	}
+
+	query := `
+		INSERT INTO room_members (room_id, user_id, role, created_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (room_id, user_id) DO UPDATE SET role = EXCLUDED.role
+	`
+	_, err := r.db.ExecContext(ctx, query, roomID, userID, string(role), time.Now().UTC())
+	return err
+}
+
+func (r *RoomMembershipRepository) Remove(ctx context.Context, roomID uuid.UUID, userID uuid.UUID) error {
+	query := `DELETE FROM room_members WHERE room_id = $1 AND user_id = $2`
+	_, err := r.db.ExecContext(ctx, query, roomID, userID)
+	return err
 }
 
