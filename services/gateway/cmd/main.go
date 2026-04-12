@@ -13,8 +13,9 @@ import (
 func main() {
 	rdb := redisinfra.NewClient()
 	producer := kafkainfra.NewProducer("localhost:9092")
+	ticketStore := redisinfra.NewWSTicketStore(rdb)
 
-	http.HandleFunc("/socket", ws.HandleWS(rdb, producer))
+	http.HandleFunc("/socket", ws.HandleWS(rdb, producer, ticketStore))
 
 	log.Logger.Info("Gateway rodando em :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {

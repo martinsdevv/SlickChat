@@ -29,26 +29,31 @@ func main() {
 
 	producer := kafkainfra.NewProducer("localhost:9092")
 
-	// Redis (needed for connection notifier)
+	// Redis
 	rdb := redisinfra.NewClient()
 	connNotifier := redisinfra.NewConnectionNotifier(rdb)
+	ticketStore := redisinfra.NewWSTicketStore(rdb)
 
 	// Auth use cases
 	registerUC := coreauth.NewRegisterUseCase(userRepo)
 	loginUC := coreauth.NewLoginUseCase(userRepo, sessionRepo)
 	logoutUC := coreauth.NewLogoutUseCase(sessionRepo)
+	issueTicketUC := coreauth.NewIssueWSTicketUseCase(sessionRepo, ticketStore)
 
 	// Handlers
 	handler := api.NewMessageHandler(repo)
 	roomContextHandler := api.NewRoomContextHandler(roomRepo, membershipRepo)
 	messageContextHandler := api.NewMessageContextHandler(repo)
 	roomMembershipWrite := api.NewRoomMembershipWriteHandler(producer, roomRepo, membershipRepo)
-	authHandler := api.NewAuthHandler(registerUC, loginUC, logoutUC, connNotifier)
+	authHandler := api.NewAuthHandler(registerUC, loginUC, logoutUC, issueTicketUC, connNotifier)
+	roomHandler := api.NewRoomHandler(roomRepo, membershipRepo, sessionRepo)
 
 	// Routes
 	http.HandleFunc("/register", authHandler.Register)
 	http.HandleFunc("/login", authHandler.Login)
 	http.HandleFunc("/logout", authHandler.Logout)
+	http.HandleFunc("/ws-ticket", authHandler.IssueWSTicket)
+	http.HandleFunc("/rooms", roomHandler.CreateRoom)
 
 	http.HandleFunc("/messages", handler.GetMessages)
 	http.HandleFunc("/room-context", roomContextHandler.GetRoomContext)

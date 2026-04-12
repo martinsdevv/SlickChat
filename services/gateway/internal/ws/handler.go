@@ -2,12 +2,15 @@ package ws
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/martinsdevv/slickchat/core/contracts"
 	"github.com/martinsdevv/slickchat/core/events"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
@@ -58,8 +61,23 @@ type MessageDeletePayload struct {
 	RoomID    string `json:"room_id"`
 }
 
-func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc {
+func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer, tickets contracts.WSTicketStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ticketRaw := r.URL.Query().Get("ticket")
+		if ticketRaw == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		sum := sha256.Sum256([]byte(ticketRaw))
+		ticketHash := hex.EncodeToString(sum[:])
+
+		resolvedUserID, err := tickets.GetAndDelete(r.Context(), ticketHash)
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Logger.Info("erro no upgrade", "error", err)
@@ -72,12 +90,7 @@ func HandleWS(rdb *redis.Client, producer *kafkainfra.Producer) http.HandlerFunc
 			Conn: conn,
 		}
 
-		userID := r.URL.Query().Get("user_id")
-		if userID == "" {
-			sendError(client, "unauthorized")
-			conn.Close()
-			return
-		}
+		userID := resolvedUserID.String()
 		gatewayID := "gateway-1"
 
 		mu.Lock()

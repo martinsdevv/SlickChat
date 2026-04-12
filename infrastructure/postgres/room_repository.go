@@ -19,6 +19,35 @@ func NewRoomRepository(db *sql.DB) contracts.RoomRepository {
 	return &RoomRepository{db: db}
 }
 
+func (r *RoomRepository) Save(ctx context.Context, room *domain.Room) error {
+	query := `
+		INSERT INTO rooms (id, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+
+	ownerID := sql.NullString{}
+	if room.OwnerID != uuid.Nil {
+		ownerID = sql.NullString{String: room.OwnerID.String(), Valid: true}
+	}
+
+	var expiresAt sql.NullTime
+	if room.ExpiresAt != nil {
+		expiresAt = sql.NullTime{Time: *room.ExpiresAt, Valid: true}
+	}
+
+	_, err := r.db.ExecContext(ctx, query,
+		room.ID,
+		string(room.Type),
+		ownerID,
+		room.TTL,
+		room.ParanoidMode,
+		room.ZeroLogging,
+		room.CreatedAt,
+		expiresAt,
+	)
+	return err
+}
+
 func (r *RoomRepository) GetByID(ctx context.Context, roomID uuid.UUID) (*domain.Room, error) {
 	query := `
 		SELECT id, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at

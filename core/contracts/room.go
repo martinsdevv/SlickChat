@@ -8,6 +8,7 @@ import (
 )
 
 type RoomRepository interface {
+	Save(ctx context.Context, room *domain.Room) error
 	GetByID(ctx context.Context, roomID uuid.UUID) (*domain.Room, error)
 }
 

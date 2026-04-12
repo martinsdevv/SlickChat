@@ -13,23 +13,26 @@ import (
 )
 
 type AuthHandler struct {
-	register  *auth.RegisterUseCase
-	login     *auth.LoginUseCase
-	logout    *auth.LogoutUseCase
-	notifier  contracts.ConnectionNotifier
+	register      *auth.RegisterUseCase
+	login         *auth.LoginUseCase
+	logout        *auth.LogoutUseCase
+	issueWSTicket *auth.IssueWSTicketUseCase
+	notifier      contracts.ConnectionNotifier
 }
 
 func NewAuthHandler(
 	register *auth.RegisterUseCase,
 	login *auth.LoginUseCase,
 	logout *auth.LogoutUseCase,
+	issueWSTicket *auth.IssueWSTicketUseCase,
 	notifier contracts.ConnectionNotifier,
 ) *AuthHandler {
 	return &AuthHandler{
-		register: register,
-		login:    login,
-		logout:   logout,
-		notifier: notifier,
+		register:      register,
+		login:         login,
+		logout:        logout,
+		issueWSTicket: issueWSTicket,
+		notifier:      notifier,
 	}
 }
 
@@ -150,6 +153,39 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	_ = h.notifier.ForceDisconnectUser(r.Context(), result.UserID)
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// POST /ws-ticket
+// Header: Authorization: Bearer <session_token>
+func (h *AuthHandler) IssueWSTicket(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	token := extractBearerToken(r)
+	if token == "" {
+		http.Error(w, "missing authorization token", http.StatusUnauthorized)
+		return
+	}
+
+	result, err := h.issueWSTicket.Execute(r.Context(), token)
+	if err != nil {
+		if errors.Is(err, domain.ErrSessionNotFound) || errors.Is(err, domain.ErrSessionExpired) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	json.NewEncoder(w).Encode(wsTicketResponse{Ticket: result.TicketRaw})
+}
+
+type wsTicketResponse struct {
+	Ticket string `json:"ticket"`
 }
 
 type registerResponse struct {
