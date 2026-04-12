@@ -1,0 +1,17 @@
+:root {
+  --bg-0: #0a0a0a;
+  --bg-1: #1a1a1a;
+  --bg-2: #2d2d2d;
+
+  --text-0: #ffffff;
+  --text-1: #f0f0f0;
+  --text-2: #a0a0a0;
+  --text-3: #7f7f7f;
+
+  --primary-500: #7a00ff;
+  --primary-400: #a052ff;
+
+  --success-500: #4caf50;
+  --warning-500: #ffc107;
+  --danger-500: #f44336;
+}

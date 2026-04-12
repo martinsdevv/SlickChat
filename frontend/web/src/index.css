@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "./shared/styles/tokens.css";
+
+html,
+body,
+#root {
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-family: Inter, Roboto, "Open Sans", system-ui, -apple-system, sans-serif;
+}
