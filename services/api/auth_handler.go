@@ -13,11 +13,13 @@ import (
 )
 
 type AuthHandler struct {
-	register      *auth.RegisterUseCase
-	login         *auth.LoginUseCase
-	logout        *auth.LogoutUseCase
-	issueWSTicket *auth.IssueWSTicketUseCase
-	notifier      contracts.ConnectionNotifier
+	register        *auth.RegisterUseCase
+	login           *auth.LoginUseCase
+	logout          *auth.LogoutUseCase
+	issueWSTicket   *auth.IssueWSTicketUseCase
+	validateSession *auth.ValidateSessionUseCase
+	users           contracts.UserRepository
+	notifier        contracts.ConnectionNotifier
 }
 
 func NewAuthHandler(
@@ -25,14 +27,18 @@ func NewAuthHandler(
 	login *auth.LoginUseCase,
 	logout *auth.LogoutUseCase,
 	issueWSTicket *auth.IssueWSTicketUseCase,
+	validateSession *auth.ValidateSessionUseCase,
+	users contracts.UserRepository,
 	notifier contracts.ConnectionNotifier,
 ) *AuthHandler {
 	return &AuthHandler{
-		register:      register,
-		login:         login,
-		logout:        logout,
-		issueWSTicket: issueWSTicket,
-		notifier:      notifier,
+		register:        register,
+		login:           login,
+		logout:          logout,
+		issueWSTicket:   issueWSTicket,
+		validateSession: validateSession,
+		users:           users,
+		notifier:        notifier,
 	}
 }
 
@@ -186,6 +192,46 @@ func (h *AuthHandler) IssueWSTicket(w http.ResponseWriter, r *http.Request) {
 
 type wsTicketResponse struct {
 	Ticket string `json:"ticket"`
+}
+
+// GET /users/me
+// Header: Authorization: Bearer <session_token>
+func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	token := extractBearerToken(r)
+	if token == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	session, err := h.validateSession.Execute(r.Context(), token)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := h.users.GetByID(r.Context(), session.UserID)
+	if err != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(meResponse{
+		UserID:    user.ID.String(),
+		Handle:    user.Handle(),
+		CreatedAt: user.CreatedAt,
+	})
+}
+
+type meResponse struct {
+	UserID    string    `json:"user_id"`
+	Handle    string    `json:"handle"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type registerResponse struct {

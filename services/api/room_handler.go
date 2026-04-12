@@ -56,6 +56,7 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
+		Name         string `json:"name"`
 		Type         string `json:"type"`
 		TTL          int    `json:"ttl"`
 		ParanoidMode bool   `json:"paranoid_mode"`
@@ -64,6 +65,11 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if body.Name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
 		return
 	}
 
@@ -78,6 +84,7 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	room := &domain.Room{
 		ID:           uuid.New(),
+		Name:         body.Name,
 		Type:         roomType,
 		OwnerID:      session.UserID,
 		TTL:          body.TTL,
@@ -106,6 +113,7 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(createRoomResponse{
 		RoomID:       room.ID.String(),
+		Name:         room.Name,
 		Type:         string(room.Type),
 		OwnerID:      room.OwnerID.String(),
 		TTL:          room.TTL,
@@ -118,6 +126,7 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 
 type createRoomResponse struct {
 	RoomID       string     `json:"room_id"`
+	Name         string     `json:"name"`
 	Type         string     `json:"type"`
 	OwnerID      string     `json:"owner_id"`
 	TTL          int        `json:"ttl"`
@@ -125,4 +134,96 @@ type createRoomResponse struct {
 	ZeroLogging  bool       `json:"zero_logging"`
 	CreatedAt    time.Time  `json:"created_at"`
 	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+}
+
+// GET /rooms?limit=50
+func (h *RoomHandler) ListRooms(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	limit := 50
+	rooms, err := h.rooms.ListPublic(r.Context(), limit)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	type roomItem struct {
+		RoomID       string     `json:"room_id"`
+		Name         string     `json:"name"`
+		Type         string     `json:"type"`
+		OwnerID      string     `json:"owner_id,omitempty"`
+		TTL          int        `json:"ttl"`
+		ParanoidMode bool       `json:"paranoid_mode"`
+		ZeroLogging  bool       `json:"zero_logging"`
+		CreatedAt    time.Time  `json:"created_at"`
+		ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+	}
+
+	items := make([]roomItem, 0, len(rooms))
+	for _, room := range rooms {
+		item := roomItem{
+			RoomID:       room.ID.String(),
+			Name:         room.Name,
+			Type:         string(room.Type),
+			TTL:          room.TTL,
+			ParanoidMode: room.ParanoidMode,
+			ZeroLogging:  room.ZeroLogging,
+			CreatedAt:    room.CreatedAt,
+			ExpiresAt:    room.ExpiresAt,
+		}
+		if room.OwnerID != uuid.Nil {
+			item.OwnerID = room.OwnerID.String()
+		}
+		items = append(items, item)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(items)
+}
+
+// GET /room-members?room_id=
+func (h *RoomHandler) ListRoomMembers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	rawRoomID := r.URL.Query().Get("room_id")
+	if rawRoomID == "" {
+		http.Error(w, "room_id required", http.StatusBadRequest)
+		return
+	}
+
+	roomID, err := uuid.Parse(rawRoomID)
+	if err != nil {
+		http.Error(w, "invalid room_id", http.StatusBadRequest)
+		return
+	}
+
+	members, err := h.memberships.ListByRoom(r.Context(), roomID)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	type memberItem struct {
+		UserID string `json:"user_id"`
+		Handle string `json:"handle"`
+		Role   string `json:"role"`
+	}
+
+	items := make([]memberItem, 0, len(members))
+	for _, m := range members {
+		items = append(items, memberItem{
+			UserID: m.UserID.String(),
+			Handle: m.Handle,
+			Role:   string(m.Role),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(items)
 }

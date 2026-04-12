@@ -46,7 +46,7 @@ func main() {
 	roomContextHandler := api.NewRoomContextHandler(roomRepo, membershipRepo)
 	messageContextHandler := api.NewMessageContextHandler(repo)
 	roomMembershipWrite := api.NewRoomMembershipWriteHandler(producer, roomRepo, membershipRepo)
-	authHandler := api.NewAuthHandler(registerUC, loginUC, logoutUC, issueTicketUC, connNotifier)
+	authHandler := api.NewAuthHandler(registerUC, loginUC, logoutUC, issueTicketUC, validateSessionUC, userRepo, connNotifier)
 	roomHandler := api.NewRoomHandler(roomRepo, membershipRepo, sessionRepo)
 
 	// auth wraps a handler requiring a valid Bearer session token
@@ -59,19 +59,33 @@ func main() {
 	http.HandleFunc("/login", authHandler.Login)
 	http.HandleFunc("/logout", authHandler.Logout)
 	http.HandleFunc("/ws-ticket", authHandler.IssueWSTicket)
+	http.HandleFunc("/users/me", authHandler.Me)
 
-	// Routes — authenticated
-	http.HandleFunc("/rooms", auth(roomHandler.CreateRoom))
-	http.HandleFunc("/room-members", auth(func(w http.ResponseWriter, r *http.Request) {
+	// GET /rooms is public (listing); POST /rooms requires auth
+	http.HandleFunc("/rooms", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
+		case http.MethodGet:
+			roomHandler.ListRooms(w, r)
 		case http.MethodPost:
-			roomMembershipWrite.JoinRoom(w, r)
-		case http.MethodDelete:
-			roomMembershipWrite.LeaveRoom(w, r)
+			auth(roomHandler.CreateRoom)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
-	}))
+	})
+
+	// Routes — authenticated (write); GET open to authenticated users
+	http.HandleFunc("/room-members", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			roomHandler.ListRoomMembers(w, r)
+		case http.MethodPost:
+			auth(roomMembershipWrite.JoinRoom)(w, r)
+		case http.MethodDelete:
+			auth(roomMembershipWrite.LeaveRoom)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	// Routes — internal (called by gateway, no Bearer required)
 	http.HandleFunc("/messages", handler.GetMessages)

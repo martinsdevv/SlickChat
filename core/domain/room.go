@@ -17,6 +17,7 @@ const (
 
 type Room struct {
 	ID           uuid.UUID
+	Name         string
 	Type         RoomType
 	OwnerID      uuid.UUID
 	TTL          int

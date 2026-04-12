@@ -11,6 +11,7 @@ import (
 	"github.com/martinsdevv/slickchat/core/domain"
 )
 
+
 type RoomMembershipRepository struct {
 	db *sql.DB
 }
@@ -69,5 +70,43 @@ func (r *RoomMembershipRepository) Remove(ctx context.Context, roomID uuid.UUID,
 	query := `DELETE FROM room_members WHERE room_id = $1 AND user_id = $2`
 	_, err := r.db.ExecContext(ctx, query, roomID, userID)
 	return err
+}
+
+func (r *RoomMembershipRepository) ListByRoom(ctx context.Context, roomID uuid.UUID) ([]contracts.MemberInfo, error) {
+	query := `
+		SELECT rm.user_id, u.username, u.discriminator, rm.role
+		FROM room_members rm
+		JOIN users u ON u.id = rm.user_id
+		WHERE rm.room_id = $1
+		ORDER BY rm.created_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []contracts.MemberInfo
+	for rows.Next() {
+		var (
+			userID        uuid.UUID
+			username      string
+			discriminator string
+			role          string
+		)
+
+		if err := rows.Scan(&userID, &username, &discriminator, &role); err != nil {
+			return nil, err
+		}
+
+		members = append(members, contracts.MemberInfo{
+			UserID: userID,
+			Handle: username + "#" + discriminator,
+			Role:   domain.Role(role),
+		})
+	}
+
+	return members, rows.Err()
 }
 

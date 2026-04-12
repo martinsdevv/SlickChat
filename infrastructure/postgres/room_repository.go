@@ -21,8 +21,8 @@ func NewRoomRepository(db *sql.DB) contracts.RoomRepository {
 
 func (r *RoomRepository) Save(ctx context.Context, room *domain.Room) error {
 	query := `
-		INSERT INTO rooms (id, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO rooms (id, name, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
 	ownerID := sql.NullString{}
@@ -37,6 +37,7 @@ func (r *RoomRepository) Save(ctx context.Context, room *domain.Room) error {
 
 	_, err := r.db.ExecContext(ctx, query,
 		room.ID,
+		room.Name,
 		string(room.Type),
 		ownerID,
 		room.TTL,
@@ -50,13 +51,49 @@ func (r *RoomRepository) Save(ctx context.Context, room *domain.Room) error {
 
 func (r *RoomRepository) GetByID(ctx context.Context, roomID uuid.UUID) (*domain.Room, error) {
 	query := `
-		SELECT id, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at
+		SELECT id, name, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at
 		FROM rooms
 		WHERE id = $1
 	`
+	return r.scanRoom(r.db.QueryRowContext(ctx, query, roomID))
+}
 
+func (r *RoomRepository) ListPublic(ctx context.Context, limit int) ([]*domain.Room, error) {
+	query := `
+		SELECT id, name, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at
+		FROM rooms
+		WHERE type = 'PUBLIC'
+		  AND (expires_at IS NULL OR expires_at > NOW())
+		ORDER BY created_at DESC
+		LIMIT $1
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rooms []*domain.Room
+	for rows.Next() {
+		room, err := r.scanRoom(rows)
+		if err != nil {
+			return nil, err
+		}
+		rooms = append(rooms, room)
+	}
+
+	return rooms, rows.Err()
+}
+
+type roomScanner interface {
+	Scan(dest ...any) error
+}
+
+func (r *RoomRepository) scanRoom(row roomScanner) (*domain.Room, error) {
 	var (
 		id           uuid.UUID
+		name         string
 		roomType     string
 		ownerID      sql.NullString
 		ttl          int
@@ -66,8 +103,9 @@ func (r *RoomRepository) GetByID(ctx context.Context, roomID uuid.UUID) (*domain
 		expiresAt    sql.NullTime
 	)
 
-	if err := r.db.QueryRowContext(ctx, query, roomID).Scan(
+	if err := row.Scan(
 		&id,
+		&name,
 		&roomType,
 		&ownerID,
 		&ttl,
@@ -97,13 +135,13 @@ func (r *RoomRepository) GetByID(ctx context.Context, roomID uuid.UUID) (*domain
 	rt := domain.RoomType(roomType)
 	switch rt {
 	case domain.RoomTypePublic, domain.RoomTypePrivate, domain.RoomTypeDirect, domain.RoomTypeTemporary:
-		// ok
 	default:
 		return nil, errors.New("invalid room type")
 	}
 
 	return &domain.Room{
 		ID:           id,
+		Name:         name,
 		Type:         rt,
 		OwnerID:      owner,
 		TTL:          ttl,
@@ -113,4 +151,3 @@ func (r *RoomRepository) GetByID(ctx context.Context, roomID uuid.UUID) (*domain
 		ExpiresAt:    exp,
 	}, nil
 }
-
