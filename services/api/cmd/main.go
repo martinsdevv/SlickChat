@@ -39,6 +39,7 @@ func main() {
 	loginUC := coreauth.NewLoginUseCase(userRepo, sessionRepo)
 	logoutUC := coreauth.NewLogoutUseCase(sessionRepo)
 	issueTicketUC := coreauth.NewIssueWSTicketUseCase(sessionRepo, ticketStore)
+	validateSessionUC := coreauth.NewValidateSessionUseCase(sessionRepo)
 
 	// Handlers
 	handler := api.NewMessageHandler(repo)
@@ -48,17 +49,20 @@ func main() {
 	authHandler := api.NewAuthHandler(registerUC, loginUC, logoutUC, issueTicketUC, connNotifier)
 	roomHandler := api.NewRoomHandler(roomRepo, membershipRepo, sessionRepo)
 
-	// Routes
+	// auth wraps a handler requiring a valid Bearer session token
+	auth := func(h http.HandlerFunc) http.HandlerFunc {
+		return api.AuthMiddleware(validateSessionUC, h)
+	}
+
+	// Routes — public
 	http.HandleFunc("/register", authHandler.Register)
 	http.HandleFunc("/login", authHandler.Login)
 	http.HandleFunc("/logout", authHandler.Logout)
 	http.HandleFunc("/ws-ticket", authHandler.IssueWSTicket)
-	http.HandleFunc("/rooms", roomHandler.CreateRoom)
 
-	http.HandleFunc("/messages", handler.GetMessages)
-	http.HandleFunc("/room-context", roomContextHandler.GetRoomContext)
-	http.HandleFunc("/message-context", messageContextHandler.GetMessageContext)
-	http.HandleFunc("/room-members", func(w http.ResponseWriter, r *http.Request) {
+	// Routes — authenticated
+	http.HandleFunc("/rooms", auth(roomHandler.CreateRoom))
+	http.HandleFunc("/room-members", auth(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
 			roomMembershipWrite.JoinRoom(w, r)
@@ -67,7 +71,12 @@ func main() {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
-	})
+	}))
+
+	// Routes — internal (called by gateway, no Bearer required)
+	http.HandleFunc("/messages", handler.GetMessages)
+	http.HandleFunc("/room-context", roomContextHandler.GetRoomContext)
+	http.HandleFunc("/message-context", messageContextHandler.GetMessageContext)
 
 	port := ":8081"
 	log.Logger.Info("API running on port" + port)

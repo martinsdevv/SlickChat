@@ -29,34 +29,34 @@ func NewRoomMembershipWriteHandler(
 	}
 }
 
-// JoinRoom POST /room-members?room_id=&user_id=&role=MEMBER
+// JoinRoom POST /room-members?room_id=&role=MEMBER
+// Requires auth middleware — user_id comes from the session context.
 func (h *RoomMembershipWriteHandler) JoinRoom(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	userID := UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	rawRoomID := r.URL.Query().Get("room_id")
-	rawUserID := r.URL.Query().Get("user_id")
 	rawRole := r.URL.Query().Get("role")
 	if rawRole == "" {
 		rawRole = string(domain.RoleMember)
 	}
 
-	if rawRoomID == "" || rawUserID == "" {
-		http.Error(w, "room_id and user_id required", http.StatusBadRequest)
+	if rawRoomID == "" {
+		http.Error(w, "room_id required", http.StatusBadRequest)
 		return
 	}
 
 	roomID, err := uuid.Parse(rawRoomID)
 	if err != nil {
 		http.Error(w, "invalid room_id", http.StatusBadRequest)
-		return
-	}
-
-	userID, err := uuid.Parse(rawUserID)
-	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
 		return
 	}
 
@@ -81,29 +81,29 @@ func (h *RoomMembershipWriteHandler) JoinRoom(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// LeaveRoom DELETE /room-members?room_id=&user_id=
+// LeaveRoom DELETE /room-members?room_id=
+// Requires auth middleware — user_id comes from the session context.
 func (h *RoomMembershipWriteHandler) LeaveRoom(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	userID := UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	rawRoomID := r.URL.Query().Get("room_id")
-	rawUserID := r.URL.Query().Get("user_id")
-	if rawRoomID == "" || rawUserID == "" {
-		http.Error(w, "room_id and user_id required", http.StatusBadRequest)
+	if rawRoomID == "" {
+		http.Error(w, "room_id required", http.StatusBadRequest)
 		return
 	}
 
 	roomID, err := uuid.Parse(rawRoomID)
 	if err != nil {
 		http.Error(w, "invalid room_id", http.StatusBadRequest)
-		return
-	}
-
-	userID, err := uuid.Parse(rawUserID)
-	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
 		return
 	}
 
