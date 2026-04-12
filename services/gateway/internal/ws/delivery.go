@@ -303,7 +303,33 @@ func handleIncomingEvent(connectionID string, event events.Event) {
 
 	case events.EventTypeMessageExpired:
 		sendToConnection(connectionID, "message.expired", json.RawMessage(event.Payload))
+
+	case events.EventTypeUserLoggedOut:
+		forceCloseConnection(connectionID)
 	}
+}
+
+// forceCloseConnection sends a session_expired frame then closes the WebSocket.
+// Closing the conn causes the ReadJSON loop in HandleWS to break, triggering
+// the deferred cleanup (Redis SRem, Del, conn.Close).
+func forceCloseConnection(connectionID string) {
+	mu.Lock()
+	client, ok := clients[connectionID]
+	mu.Unlock()
+
+	if !ok {
+		return
+	}
+
+	_ = client.Write(WSMessage{
+		Type: "session_expired",
+		Payload: map[string]string{
+			"code":   "logged_out",
+			"reason": "session was invalidated",
+		},
+	})
+
+	client.Conn.Close()
 }
 
 func handleMessageRead(
