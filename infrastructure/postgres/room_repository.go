@@ -21,8 +21,8 @@ func NewRoomRepository(db *sql.DB) contracts.RoomRepository {
 
 func (r *RoomRepository) Save(ctx context.Context, room *domain.Room) error {
 	query := `
-		INSERT INTO rooms (id, name, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO rooms (id, name, description, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	ownerID := sql.NullString{}
@@ -38,6 +38,7 @@ func (r *RoomRepository) Save(ctx context.Context, room *domain.Room) error {
 	_, err := r.db.ExecContext(ctx, query,
 		room.ID,
 		room.Name,
+		room.Description,
 		string(room.Type),
 		ownerID,
 		room.TTL,
@@ -51,7 +52,7 @@ func (r *RoomRepository) Save(ctx context.Context, room *domain.Room) error {
 
 func (r *RoomRepository) GetByID(ctx context.Context, roomID uuid.UUID) (*domain.Room, error) {
 	query := `
-		SELECT id, name, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at
+		SELECT id, name, description, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at
 		FROM rooms
 		WHERE id = $1
 	`
@@ -60,7 +61,7 @@ func (r *RoomRepository) GetByID(ctx context.Context, roomID uuid.UUID) (*domain
 
 func (r *RoomRepository) ListPublic(ctx context.Context, limit int) ([]*domain.Room, error) {
 	query := `
-		SELECT id, name, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at
+		SELECT id, name, description, type, owner_id, ttl, paranoid_mode, zero_logging, created_at, expires_at
 		FROM rooms
 		WHERE type = 'PUBLIC'
 		  AND (expires_at IS NULL OR expires_at > NOW())
@@ -86,6 +87,35 @@ func (r *RoomRepository) ListPublic(ctx context.Context, limit int) ([]*domain.R
 	return rooms, rows.Err()
 }
 
+func (r *RoomRepository) ListByUser(ctx context.Context, userID uuid.UUID, limit int) ([]*domain.Room, error) {
+	query := `
+		SELECT ro.id, ro.name, ro.description, ro.type, ro.owner_id, ro.ttl, ro.paranoid_mode, ro.zero_logging, ro.created_at, ro.expires_at
+		FROM rooms ro
+		INNER JOIN room_members rm ON rm.room_id = ro.id
+		WHERE rm.user_id = $1
+		  AND (ro.expires_at IS NULL OR ro.expires_at > NOW())
+		ORDER BY ro.created_at DESC
+		LIMIT $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rooms []*domain.Room
+	for rows.Next() {
+		room, err := r.scanRoom(rows)
+		if err != nil {
+			return nil, err
+		}
+		rooms = append(rooms, room)
+	}
+
+	return rooms, rows.Err()
+}
+
 type roomScanner interface {
 	Scan(dest ...any) error
 }
@@ -94,6 +124,7 @@ func (r *RoomRepository) scanRoom(row roomScanner) (*domain.Room, error) {
 	var (
 		id           uuid.UUID
 		name         string
+		description  string
 		roomType     string
 		ownerID      sql.NullString
 		ttl          int
@@ -106,6 +137,7 @@ func (r *RoomRepository) scanRoom(row roomScanner) (*domain.Room, error) {
 	if err := row.Scan(
 		&id,
 		&name,
+		&description,
 		&roomType,
 		&ownerID,
 		&ttl,
@@ -142,6 +174,7 @@ func (r *RoomRepository) scanRoom(row roomScanner) (*domain.Room, error) {
 	return &domain.Room{
 		ID:           id,
 		Name:         name,
+		Description:  description,
 		Type:         rt,
 		OwnerID:      owner,
 		TTL:          ttl,

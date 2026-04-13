@@ -31,6 +31,13 @@ func JoinRoom(
 		return err
 	}
 
+	if _, err := memberships.Get(ctx, roomID, userID); err == nil {
+		// already a member: no-op, preserve existing role
+		return nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
 	if err := memberships.Add(ctx, roomID, userID, role); err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { apiRequest } from "../../shared/api/http-client";
 import type { MessageHistoryItem, WSTicketResponse } from "../../shared/api/types";
 import { createWsClient, type WsClient, type WsEnvelope } from "../../shared/api/ws-client";
+import { useRoomsStore } from "../rooms/store";
 import { useSessionStore } from "../session/store";
 
 type DeliveryStatus = "sending" | "sent" | "delivered" | "read" | "failed";
@@ -154,9 +155,14 @@ function createMessageFromGateway(
   const sentAtRaw = payload.sent_at;
   const sentAt = typeof sentAtRaw === "string" ? sentAtRaw : new Date().toISOString();
   const expiresAtRaw = payload.expires_at;
-  const expiresAt = typeof expiresAtRaw === "string" ? expiresAtRaw : null;
   const ttlRaw = payload.ttl;
   const ttl = typeof ttlRaw === "number" ? ttlRaw : null;
+  const expiresAt =
+    typeof expiresAtRaw === "string"
+      ? expiresAtRaw
+      : ttl && ttl > 0
+        ? new Date(Date.parse(sentAt) + ttl * 1000).toISOString()
+        : null;
   const isTemporary = Boolean(ttl && ttl > 0);
 
   return {
@@ -419,19 +425,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     const messageId = `local-${crypto.randomUUID()}`;
+    const room = useRoomsStore.getState().rooms.find((item) => item.room_id === roomId) ?? null;
+    const ttlSeconds = room && room.ttl > 0 ? room.ttl : null;
+    const expiresAt =
+      ttlSeconds !== null ? new Date(Date.now() + ttlSeconds * 1000).toISOString() : null;
     const optimisticMessage: ChatMessage = {
       id: messageId,
       roomId,
       authorId: sessionUser.userId,
-      authorHandle: "você",
+      authorHandle: sessionUser.handle,
       content: draft,
       status: "sending",
       createdAt: new Date().toISOString(),
       isOwn: true,
-      expiresAt: null,
-      ttlSeconds: null,
-      isZeroLogging: false,
-      isTemporary: false,
+      expiresAt,
+      ttlSeconds,
+      isZeroLogging: Boolean(room?.zero_logging),
+      isTemporary: Boolean(ttlSeconds && ttlSeconds > 0),
     };
 
     set((state) => ({

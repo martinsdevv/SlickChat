@@ -22,9 +22,14 @@ func NewRoomMembershipRepository(db *sql.DB) contracts.RoomMembershipRepository 
 
 func (r *RoomMembershipRepository) Get(ctx context.Context, roomID uuid.UUID, userID uuid.UUID) (*domain.RoomMembership, error) {
 	query := `
-		SELECT user_id, role
-		FROM room_members
-		WHERE room_id = $1 AND user_id = $2
+		SELECT rm.user_id,
+		       CASE
+		         WHEN ro.owner_id = rm.user_id THEN 'ADMIN'
+		         ELSE rm.role
+		       END AS effective_role
+		FROM room_members rm
+		JOIN rooms ro ON ro.id = rm.room_id
+		WHERE rm.room_id = $1 AND rm.user_id = $2
 	`
 
 	var (
@@ -60,7 +65,7 @@ func (r *RoomMembershipRepository) Add(ctx context.Context, roomID uuid.UUID, us
 	query := `
 		INSERT INTO room_members (room_id, user_id, role, created_at)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (room_id, user_id) DO UPDATE SET role = EXCLUDED.role
+		ON CONFLICT (room_id, user_id) DO NOTHING
 	`
 	_, err := r.db.ExecContext(ctx, query, roomID, userID, string(role), time.Now().UTC())
 	return err
@@ -74,9 +79,14 @@ func (r *RoomMembershipRepository) Remove(ctx context.Context, roomID uuid.UUID,
 
 func (r *RoomMembershipRepository) ListByRoom(ctx context.Context, roomID uuid.UUID) ([]contracts.MemberInfo, error) {
 	query := `
-		SELECT rm.user_id, u.username, u.discriminator, rm.role
+		SELECT rm.user_id, u.username, u.discriminator,
+		       CASE
+		         WHEN ro.owner_id = rm.user_id THEN 'ADMIN'
+		         ELSE rm.role
+		       END AS effective_role
 		FROM room_members rm
 		JOIN users u ON u.id = rm.user_id
+		JOIN rooms ro ON ro.id = rm.room_id
 		WHERE rm.room_id = $1
 		ORDER BY rm.created_at ASC
 	`

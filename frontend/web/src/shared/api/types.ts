@@ -48,6 +48,7 @@ export type MeResponse = {
 export type Room = {
   room_id: string;
   name: string;
+  description: string;
   type: "PUBLIC" | "PRIVATE" | "DIRECT" | "TEMPORARY";
   owner_id?: string;
   ttl: number;
@@ -59,9 +60,9 @@ export type Room = {
 
 export type CreateRoomRequest = {
   name: string;
+  description?: string;
   type: Room["type"];
   ttl: number;
-  paranoid_mode: boolean;
   zero_logging: boolean;
 };
 

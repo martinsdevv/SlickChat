@@ -16,7 +16,9 @@ type RoomsState = {
   loadRooms: (token: string) => Promise<void>;
   createRoom: (token: string, input: CreateRoomRequest) => Promise<Room>;
   joinRoom: (token: string, roomId: string) => Promise<void>;
+  addMember: (token: string, roomId: string, handle: string) => Promise<void>;
   loadMembers: (token: string, roomId: string) => Promise<void>;
+  reset: () => void;
 };
 
 function sortRoomsByPriority(rooms: Room[]): Room[] {
@@ -44,9 +46,13 @@ export const useRoomsStore = create<RoomsState>((set) => ({
     try {
       const rooms = await apiRequest<Room[]>("/rooms", { token });
       const sorted = sortRoomsByPriority(rooms);
+      const activeStillExists = (activeRoomId: string | null) =>
+        activeRoomId !== null && sorted.some((room) => room.room_id === activeRoomId);
       set((state) => ({
         rooms: sorted,
-        activeRoomId: state.activeRoomId ?? sorted[0]?.room_id ?? null,
+        activeRoomId: activeStillExists(state.activeRoomId)
+          ? state.activeRoomId
+          : sorted[0]?.room_id ?? null,
       }));
     } finally {
       set({ isLoadingRooms: false });
@@ -78,6 +84,16 @@ export const useRoomsStore = create<RoomsState>((set) => ({
       query: { room_id: roomId },
     });
   },
+  addMember: async (token, roomId, handle) => {
+    await apiRequest<void>("/room-members/add", {
+      method: "POST",
+      token,
+      body: {
+        room_id: roomId,
+        handle,
+      },
+    });
+  },
   loadMembers: async (token, roomId) => {
     const members = await apiRequest<RoomMember[]>("/room-members", {
       token,
@@ -91,6 +107,15 @@ export const useRoomsStore = create<RoomsState>((set) => ({
       },
     }));
   },
+  reset: () =>
+    set({
+      rooms: [],
+      activeRoomId: null,
+      membersByRoom: {},
+      isLoadingRooms: false,
+      isCreatingRoom: false,
+      roomFilter: "ALL",
+    }),
 }));
 
 export function filterRooms(rooms: Room[], filter: RoomFilters): Room[] {

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { apiRequest } from "../../shared/api/http-client";
+import { useRoomsStore } from "../rooms/store";
 import type {
   LoginRequest,
   LoginResponse,
@@ -69,6 +70,8 @@ export const useSessionStore = create<SessionState>()(
         };
       },
       login: async (input) => {
+        useRoomsStore.getState().reset();
+
         const response = await apiRequest<LoginResponse>("/login", {
           method: "POST",
           body: input,
@@ -132,6 +135,7 @@ export const useSessionStore = create<SessionState>()(
           user: null,
           isAuthenticated: false,
         });
+        useRoomsStore.getState().reset();
       },
     }),
     {

@@ -57,6 +57,7 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		Name         string `json:"name"`
+		Description  string `json:"description"`
 		Type         string `json:"type"`
 		TTL          int    `json:"ttl"`
 		ParanoidMode bool   `json:"paranoid_mode"`
@@ -85,17 +86,13 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 	room := &domain.Room{
 		ID:           uuid.New(),
 		Name:         body.Name,
+		Description:  body.Description,
 		Type:         roomType,
 		OwnerID:      session.UserID,
 		TTL:          body.TTL,
 		ParanoidMode: body.ParanoidMode,
 		ZeroLogging:  body.ZeroLogging,
 		CreatedAt:    now,
-	}
-
-	if body.TTL > 0 {
-		exp := now.Add(time.Duration(body.TTL) * time.Second)
-		room.ExpiresAt = &exp
 	}
 
 	if err := h.rooms.Save(r.Context(), room); err != nil {
@@ -114,6 +111,7 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(createRoomResponse{
 		RoomID:       room.ID.String(),
 		Name:         room.Name,
+		Description:  room.Description,
 		Type:         string(room.Type),
 		OwnerID:      room.OwnerID.String(),
 		TTL:          room.TTL,
@@ -127,6 +125,7 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 type createRoomResponse struct {
 	RoomID       string     `json:"room_id"`
 	Name         string     `json:"name"`
+	Description  string     `json:"description"`
 	Type         string     `json:"type"`
 	OwnerID      string     `json:"owner_id"`
 	TTL          int        `json:"ttl"`
@@ -143,8 +142,14 @@ func (h *RoomHandler) ListRooms(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	limit := 50
-	rooms, err := h.rooms.ListPublic(r.Context(), limit)
+	rooms, err := h.rooms.ListByUser(r.Context(), userID, limit)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -153,6 +158,7 @@ func (h *RoomHandler) ListRooms(w http.ResponseWriter, r *http.Request) {
 	type roomItem struct {
 		RoomID       string     `json:"room_id"`
 		Name         string     `json:"name"`
+		Description  string     `json:"description"`
 		Type         string     `json:"type"`
 		OwnerID      string     `json:"owner_id,omitempty"`
 		TTL          int        `json:"ttl"`
@@ -167,6 +173,7 @@ func (h *RoomHandler) ListRooms(w http.ResponseWriter, r *http.Request) {
 		item := roomItem{
 			RoomID:       room.ID.String(),
 			Name:         room.Name,
+			Description:  room.Description,
 			Type:         string(room.Type),
 			TTL:          room.TTL,
 			ParanoidMode: room.ParanoidMode,
@@ -200,6 +207,17 @@ func (h *RoomHandler) ListRoomMembers(w http.ResponseWriter, r *http.Request) {
 	roomID, err := uuid.Parse(rawRoomID)
 	if err != nil {
 		http.Error(w, "invalid room_id", http.StatusBadRequest)
+		return
+	}
+
+	userID := UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if _, err := h.memberships.Get(r.Context(), roomID, userID); err != nil {
+		http.Error(w, "not a room member", http.StatusForbidden)
 		return
 	}
 

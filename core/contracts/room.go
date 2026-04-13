@@ -11,6 +11,7 @@ type RoomRepository interface {
 	Save(ctx context.Context, room *domain.Room) error
 	GetByID(ctx context.Context, roomID uuid.UUID) (*domain.Room, error)
 	ListPublic(ctx context.Context, limit int) ([]*domain.Room, error)
+	ListByUser(ctx context.Context, userID uuid.UUID, limit int) ([]*domain.Room, error)
 }
 
 // MemberInfo is a read model combining membership and user identity.

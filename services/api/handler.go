@@ -11,7 +11,8 @@ import (
 )
 
 type MessageHandler struct {
-	repo contracts.MessageRepository
+	repo        contracts.MessageRepository
+	memberships contracts.RoomMembershipRepository
 }
 
 type RoomContextHandler struct {
@@ -23,8 +24,11 @@ type MessageContextHandler struct {
 	repo contracts.MessageRepository
 }
 
-func NewMessageHandler(repo contracts.MessageRepository) *MessageHandler {
-	return &MessageHandler{repo: repo}
+func NewMessageHandler(repo contracts.MessageRepository, memberships contracts.RoomMembershipRepository) *MessageHandler {
+	return &MessageHandler{
+		repo:        repo,
+		memberships: memberships,
+	}
 }
 
 func NewRoomContextHandler(rooms contracts.RoomRepository, memberships contracts.RoomMembershipRepository) *RoomContextHandler {
@@ -49,6 +53,17 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	roomID, err := uuid.Parse(rawRoomID)
 	if err != nil {
 		http.Error(w, "invalid room_id", http.StatusBadRequest)
+		return
+	}
+
+	userID := UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if _, err := h.memberships.Get(r.Context(), roomID, userID); err != nil {
+		http.Error(w, "not a room member", http.StatusForbidden)
 		return
 	}
 

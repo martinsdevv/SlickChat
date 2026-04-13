@@ -57,10 +57,10 @@ func main() {
 	validateSessionUC := coreauth.NewValidateSessionUseCase(sessionRepo)
 
 	// Handlers
-	handler := api.NewMessageHandler(repo)
+	handler := api.NewMessageHandler(repo, membershipRepo)
 	roomContextHandler := api.NewRoomContextHandler(roomRepo, membershipRepo)
 	messageContextHandler := api.NewMessageContextHandler(repo)
-	roomMembershipWrite := api.NewRoomMembershipWriteHandler(producer, roomRepo, membershipRepo)
+	roomMembershipWrite := api.NewRoomMembershipWriteHandler(producer, roomRepo, membershipRepo, userRepo)
 	authHandler := api.NewAuthHandler(registerUC, loginUC, logoutUC, issueTicketUC, validateSessionUC, userRepo, connNotifier)
 	roomHandler := api.NewRoomHandler(roomRepo, membershipRepo, sessionRepo)
 
@@ -76,11 +76,11 @@ func main() {
 	http.HandleFunc("/ws-ticket", authHandler.IssueWSTicket)
 	http.HandleFunc("/users/me", authHandler.Me)
 
-	// GET /rooms is public (listing); POST /rooms requires auth
+	// /rooms requires authenticated session.
 	http.HandleFunc("/rooms", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			roomHandler.ListRooms(w, r)
+			auth(roomHandler.ListRooms)(w, r)
 		case http.MethodPost:
 			auth(roomHandler.CreateRoom)(w, r)
 		default:
@@ -88,11 +88,11 @@ func main() {
 		}
 	})
 
-	// Routes — authenticated (write); GET open to authenticated users
+	// Routes — authenticated.
 	http.HandleFunc("/room-members", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			roomHandler.ListRoomMembers(w, r)
+			auth(roomHandler.ListRoomMembers)(w, r)
 		case http.MethodPost:
 			auth(roomMembershipWrite.JoinRoom)(w, r)
 		case http.MethodDelete:
@@ -101,9 +101,12 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	http.HandleFunc("/room-members/add", auth(roomMembershipWrite.AddMember))
+
+	// Routes — mixed
+	http.HandleFunc("/messages", auth(handler.GetMessages))
 
 	// Routes — internal (called by gateway, no Bearer required)
-	http.HandleFunc("/messages", handler.GetMessages)
 	http.HandleFunc("/room-context", roomContextHandler.GetRoomContext)
 	http.HandleFunc("/message-context", messageContextHandler.GetMessageContext)
 
