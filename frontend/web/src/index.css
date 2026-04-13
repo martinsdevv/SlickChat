@@ -12,4 +12,23 @@ body {
   background: var(--bg-0);
   color: var(--text-0);
   font-family: Inter, Roboto, "Open Sans", system-ui, -apple-system, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #2f3038;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
