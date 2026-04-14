@@ -12,13 +12,13 @@
 **Endpoint:**
 
 ```
-GET /socket
+GET /socket?ticket=<ws_ticket>
 ```
 
-**Headers (futuro):**
+**Observação:**
 
 ```
-Authorization: Bearer <token>
+O ticket WebSocket é emitido pela API e deve ser usado uma única vez.
 ```
 
 ---
@@ -54,7 +54,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "type": "message_received",
+  "type": "message.received",
   "payload": {
     "message_id": "uuid",
     "room_id": "uuid",
@@ -73,7 +73,6 @@ Authorization: Bearer <token>
 {
   "type": "message_ack",
   "payload": {
-    "temp_id": "uuid",
     "status": "received"
   }
 }
@@ -105,10 +104,10 @@ connection:{connection_id} -> Hash
 
 ## 2.2 Pub/Sub (entrada de mensagens)
 
-### Canal do Gateway
+### Canal por conexão
 
 ```
-gateway:{gateway_id}
+connection:{connection_id}
 ```
 
 ---
@@ -133,13 +132,14 @@ gateway:{gateway_id}
 
 ---
 
-# 3. Gateway ↔ Worker (MVP)
+# 3. Gateway ↔ Worker
 
-## 3.1 Chamada direta (sem Kafka - MVP)
+## 3.1 Contrato via eventos (Kafka)
 
-```go
-HandleMessageSent(event MessageSent)
-```
+O Gateway publica eventos em `message-events` e os workers consomem por grupo:
+
+- `fanout-group`
+- `persistence-group`
 
 ---
 
@@ -154,10 +154,10 @@ GET connection:{connection_id}
 
 ---
 
-## 4.2 Publicação para Gateway
+## 4.2 Publicação para conexão
 
 ```
-PUBLISH gateway:{gateway_id} <message>
+PUBLISH connection:{connection_id} <event>
 ```
 
 ---
@@ -202,7 +202,7 @@ type Connection struct {
 {
   "type": "error",
   "payload": {
-    "code": "INVALID_PAYLOAD",
+    "code": "invalid_payload",
     "message": "content is required"
   }
 }
@@ -212,7 +212,7 @@ type Connection struct {
 {
   "type": "error",
   "payload": {
-    "code": "UNAUTHORIZED",
+    "code": "unauthorized",
     "message": "invalid token"
   }
 }

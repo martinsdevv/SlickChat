@@ -28,8 +28,12 @@ Descrição:
 
   * distribuir mensagens
   * persistir dados
-  * aplicar TTL
+  * aplicar fanout em tempo real via Redis Pub/Sub por conexão
   * executar moderação
+
+* O **TTL Worker** varre mensagens expiradas no **Postgres** e publica `message.expired.v1` em **Kafka**
+
+* O **Persistence Worker** consome `message.expired.v1` e remove fisicamente os registros expirados no banco
 
 * **Redis** é utilizado para presença, sessões e rate limiting
 

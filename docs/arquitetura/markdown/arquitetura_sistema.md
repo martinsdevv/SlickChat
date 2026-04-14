@@ -70,7 +70,7 @@ Funções:
 
 O gateway é **stateless**, permitindo múltiplas instâncias.
 
-Nota de Implementação: Para viabilizar a escalabilidade horizontal, o Message Fanout Worker utiliza o Redis para consultar qual instância do Realtime Gateway possui a conexão ativa do destinatário. Em seguida, entrega a mensagem diretamente àquela instância (via gRPC ou chamada interna). O Redis não atua como intermediário de entrega; apenas fornece a localização do gateway correto.
+Nota de Implementação: Para viabilizar a escalabilidade horizontal, o Message Fanout Worker resolve membros e conexões no Redis e publica os eventos em canais `connection:<connection_id>`. O Realtime Gateway com a conexão ativa consome esse canal via Redis Pub/Sub e entrega ao cliente local.
 
 ---
 
@@ -101,7 +101,7 @@ Responsabilidades:
 * suporte a alta taxa de mensagens
 * buffer de eventos para processamento assíncrono
 
-Eventos do sistema (lista completa no documento de modelo de eventos):
+Eventos do sistema (catálogo alvo; implementação atual prioriza fluxo de mensagens em `message-events`):
 
 
 `User`: 
@@ -155,14 +155,14 @@ Workers são responsáveis pelo processamento assíncrono de eventos consumidos 
 
 | Worker               | Responsabilidade                                                                                     |
 |----------------------|------------------------------------------------------------------------------------------------------|
-| **Message Fanout**   | Distribui mensagens para gateways via Redis Pub/Sub ou gRPC stream.                                  |
+| **Message Fanout**   | Consome eventos do Kafka e publica fanout em canais Redis por conexão (`connection:*`).              |
 | **Persistence**      | Persiste mensagens e eventos no Postgres (exceto quando `is_zero_logging` = true).                   |
-| **TTL**              | Remove mensagens expiradas e salas temporárias (consulta e exclusão em lote).                        |
+| **TTL**              | Varre mensagens expiradas no Postgres e publica `message.expired.v1` no Kafka.                       |
 | **Moderation**       | Processa ações de moderação (bans, mutes, kicks) e atualiza permissões.                              |
 
 Workers podem ser escalados horizontalmente.
 
-Para viabilizar a escalabilidade horizontal, o Message Fanout Worker consulta o Redis para descobrir qual instância do Realtime Gateway está atendendo o destinatário. Então entrega a mensagem diretamente a essa instância (via gRPC ou chamada interna). O Redis é usado apenas como registro de localização das conexões ativas.
+Para viabilizar a escalabilidade horizontal, o Message Fanout Worker consulta membros/conexões no Redis e publica eventos por conexão em `connection:<connection_id>`. O gateway assinante desse canal encaminha a mensagem ao cliente conectado.
 
 ---
 

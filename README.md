@@ -150,7 +150,7 @@ make run-persistence
 ## 1. Conectar via WebSocket
 
 ```bash
-wscat -c "ws://localhost:8080/socket?user_id=<UUID>"
+wscat -c "ws://localhost:8080/socket?ticket=<WS_TICKET>"
 ```
 
 ## 2. Adicionar usuário na sala

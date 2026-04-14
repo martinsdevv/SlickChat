@@ -45,7 +45,7 @@ Serviço Go que mantém conexões WebSocket.
 - Stateless, escalável horizontalmente
 - Autentica via Redis
 - Publica eventos no Kafka
-- Recebe mensagens via Redis Pub/Sub
+- Recebe mensagens via Redis Pub/Sub por canal `connection:<connection_id>`
 
 ## API Service
 
@@ -57,7 +57,7 @@ Serviço Go para operações HTTP.
 ## Kafka
 
 Broker de eventos.
-- Tópicos: `user-events`, `presence-events`, `room-events`, `message-events`, `moderation-events`
+- Tópico ativo: `message-events` (outros tópicos podem ser adicionados conforme evolução dos workers)
 - Partição por `room_id` para ordenação
 
 ## Redis
@@ -69,9 +69,10 @@ Armazenamento em memória.
 ## Workers
 
 Processadores assíncronos em Go.
-- Fanout Worker: Distribui mensagens para gateways conectados. Para isso, consulta o Redis para identificar em qual gateway o destinatário está conectado e envia a mensagem diretamente para aquela instância.
+- Fanout Worker: Consome eventos do Kafka, resolve membros/conexões no Redis e publica o fanout em canais Redis `connection:*` para entrega pelo gateway local.
 - Persistence Worker: insere dados no Postgres (exceto zero logging)
-- TTL Worker: varre e remove registros expirados
+- TTL Worker: varre mensagens expiradas no Postgres e publica `message.expired.v1` no Kafka
+- Persistence Worker: também consome `message.expired.v1` e remove fisicamente as mensagens expiradas no Postgres
 - Moderation Worker: aplica bans/mutes
 
 ## Postgres
@@ -114,8 +115,10 @@ flowchart TD
 
     Kafka -->|Events| Workers
     Workers -->|Persistence| Postgres
-    Workers -->|Query gateway location| Redis
-    Workers -->|Direct gRPC call| Gateway
+    Workers -->|Resolve members/connections + Pub/Sub connection:*| Redis
+    Redis -->|Pub/Sub por conexão| Gateway
+    Workers -->|Scan TTL| Postgres
+    Workers -->|Publish message.expired.v1| Kafka
 
     Gateway -->|WSS| Client
 

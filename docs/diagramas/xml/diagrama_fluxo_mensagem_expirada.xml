@@ -40,42 +40,21 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="GW86mE3LKwc5fNMtwXrb-182" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-177" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-174" value="Publicar MessageRead">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="705" y="289" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="GW86mE3LKwc5fNMtwXrb-183" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-174" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-173" value="Consumir MessageRead">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="236" y="343" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="GW86mE3LKwc5fNMtwXrb-184" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-173" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-174" value="Publicar MessageExpired">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="233" y="397" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="GW86mE3LKwc5fNMtwXrb-185" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-174" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-175" value="Consumir MessageExpired">
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-185" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-174" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-175" value="Consumir MessageExpired (fanout-group)">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="497" y="451" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="GW86mE3LKwc5fNMtwXrb-186" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-175" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-176" value="Publicar remoção">
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-186" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-175" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-176" value="Publicar evento de remoção em connection:*">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="732" y="505" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="GW86mE3LKwc5fNMtwXrb-187" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-176" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-177" value="Notificar gateways">
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-187" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-176" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-177" value="Gateway recebe via Redis Pub/Sub">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="937" y="559" />
@@ -89,14 +68,14 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="GW86mE3LKwc5fNMtwXrb-189" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-173" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-179" value="Deletar mensagem">
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-189" edge="1" parent="1" source="GW86mE3LKwc5fNMtwXrb-174" style="verticalAlign=bottom;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;endArrow=block;" target="GW86mE3LKwc5fNMtwXrb-179" value="Consumir MessageExpired e deletar no banco (persistence-group)">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="808" y="667" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="GW86mE3LKwc5fNMtwXrb-190" parent="1" style="fillColor=#ffff88;strokeColor=#9E916F;fontColor=light-dark(#333333,#cccccc);" value="Evento vem do cliente" vertex="1">
+        <mxCell id="GW86mE3LKwc5fNMtwXrb-190" parent="1" style="fillColor=#ffff88;strokeColor=#9E916F;fontColor=light-dark(#333333,#cccccc);" value="Fluxo periódico por polling (TTL Worker)" vertex="1">
           <mxGeometry height="52" width="185" x="941" y="203" as="geometry" />
         </mxCell>
       </root>
