@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/martinsdevv/slickchat/core/contracts"
 	"github.com/martinsdevv/slickchat/core/events"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
 	"github.com/redis/go-redis/v9"
@@ -32,7 +34,7 @@ type MessageReadWithCount struct {
 	ReadCount int `json:"read_count"`
 }
 
-func FanoutHandler(rdb *redis.Client) func(events.Event) {
+func FanoutHandler(rdb *redis.Client, memberships contracts.RoomMembershipRepository) func(events.Event) {
 	return func(event events.Event) {
 		switch event.EventType {
 
@@ -40,16 +42,16 @@ func FanoutHandler(rdb *redis.Client) func(events.Event) {
 			handleMessageDelivered(event, rdb)
 
 		case events.EventTypeMessageSent:
-			handleMessageSent(event, rdb)
+			handleMessageSent(event, rdb, memberships)
 
 		case events.EventTypeMessageRead:
 			handleMessageRead(event, rdb)
 
 		case events.EventTypeMessageDeleted:
-			handleMessageDeleted(event, rdb)
+			handleMessageDeleted(event, rdb, memberships)
 
 		case events.EventTypeMessageExpired:
-			handleMessageExpired(event, rdb)
+			handleMessageExpired(event, rdb, memberships)
 
 		case events.EventTypeUserJoinedRoom:
 			handleUserJoinedRoom(event, rdb)
@@ -58,6 +60,73 @@ func FanoutHandler(rdb *redis.Client) func(events.Event) {
 			handleUserLeftRoom(event, rdb)
 		}
 	}
+}
+
+func refreshRoomMembersFromRepo(
+	ctx context.Context,
+	rdb *redis.Client,
+	memberships contracts.RoomMembershipRepository,
+	roomID string,
+) []string {
+	if memberships == nil {
+		return nil
+	}
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return nil
+	}
+	list, err := memberships.ListByRoom(ctx, roomUUID)
+	if err != nil {
+		log.Logger.Warn("fanout failed loading room members from repo", "room_id", roomID, "error", err)
+		return nil
+	}
+	if len(list) == 0 {
+		return nil
+	}
+
+	memberIDs := make([]string, 0, len(list))
+	redisArgs := make([]interface{}, 0, len(list))
+	for _, member := range list {
+		id := member.UserID.String()
+		memberIDs = append(memberIDs, id)
+		redisArgs = append(redisArgs, id)
+	}
+
+	key := "room_members:" + roomID
+	pipe := rdb.TxPipeline()
+	pipe.Del(ctx, key)
+	pipe.SAdd(ctx, key, redisArgs...)
+	_, _ = pipe.Exec(ctx)
+	return memberIDs
+}
+
+func resolveRoomMembers(
+	ctx context.Context,
+	rdb *redis.Client,
+	memberships contracts.RoomMembershipRepository,
+	roomID string,
+	expectedUserID string,
+) []string {
+	members, _ := rdb.SMembers(ctx, "room_members:"+roomID).Result()
+	hasExpected := expectedUserID == ""
+	if expectedUserID != "" {
+		for _, userID := range members {
+			if userID == expectedUserID {
+				hasExpected = true
+				break
+			}
+		}
+	}
+
+	if len(members) > 0 && hasExpected {
+		return members
+	}
+
+	refreshed := refreshRoomMembersFromRepo(ctx, rdb, memberships, roomID)
+	if len(refreshed) > 0 {
+		return refreshed
+	}
+	return members
 }
 
 func handleMessageDelivered(event events.Event, rdb *redis.Client) {
@@ -103,7 +172,7 @@ func handleMessageDelivered(event events.Event, rdb *redis.Client) {
 	}
 }
 
-func handleMessageSent(event events.Event, rdb *redis.Client) {
+func handleMessageSent(event events.Event, rdb *redis.Client, memberships contracts.RoomMembershipRepository) {
 	ctx := context.Background()
 
 	var payload events.MessageSent
@@ -119,7 +188,7 @@ func handleMessageSent(event events.Event, rdb *redis.Client) {
 	rdb.Expire(ctx, "msg:"+payload.MessageID+":delivered", 24*time.Hour)
 	rdb.Expire(ctx, "msg:"+payload.MessageID+":read", 24*time.Hour)
 
-	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()
+	members := resolveRoomMembers(ctx, rdb, memberships, payload.RoomID, payload.SenderID)
 
 	eventBytes, _ := json.Marshal(event)
 
@@ -228,7 +297,7 @@ func isUserInRoom(rdb *redis.Client, userID, roomID string) bool {
 	return exists
 }
 
-func handleMessageDeleted(event events.Event, rdb *redis.Client) {
+func handleMessageDeleted(event events.Event, rdb *redis.Client, memberships contracts.RoomMembershipRepository) {
 	ctx := context.Background()
 
 	var payload events.MessageDeleted
@@ -241,7 +310,7 @@ func handleMessageDeleted(event events.Event, rdb *redis.Client) {
 		return
 	}
 
-	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()
+	members := resolveRoomMembers(ctx, rdb, memberships, payload.RoomID, "")
 	senderID := getMessageSender(rdb, payload.MessageID)
 
 	eventBytes, _ := json.Marshal(event)
@@ -261,7 +330,7 @@ func handleMessageDeleted(event events.Event, rdb *redis.Client) {
 	rdb.Del(ctx, "message:"+payload.MessageID)
 }
 
-func handleMessageExpired(event events.Event, rdb *redis.Client) {
+func handleMessageExpired(event events.Event, rdb *redis.Client, memberships contracts.RoomMembershipRepository) {
 	ctx := context.Background()
 
 	var payload events.MessageExpired
@@ -274,7 +343,7 @@ func handleMessageExpired(event events.Event, rdb *redis.Client) {
 		return
 	}
 
-	members, _ := rdb.SMembers(ctx, "room_members:"+payload.RoomID).Result()
+	members := resolveRoomMembers(ctx, rdb, memberships, payload.RoomID, "")
 	senderID := getMessageSender(rdb, payload.MessageID)
 
 	eventBytes, _ := json.Marshal(event)

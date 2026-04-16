@@ -3,10 +3,10 @@ import { create } from "zustand";
 type UIState = {
   isSidebarOpen: boolean;
   isRightPanelOpen: boolean;
-  mobileView: "rooms" | "chat";
+  mobileView: "rooms" | "chat" | "info";
   toggleSidebar: () => void;
   toggleRightPanel: () => void;
-  setMobileView: (view: "rooms" | "chat") => void;
+  setMobileView: (view: "rooms" | "chat" | "info") => void;
 };
 
 export const useUIStore = create<UIState>((set) => ({

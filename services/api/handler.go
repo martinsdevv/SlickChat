@@ -67,27 +67,30 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	messages, err := h.repo.ListByRoom(r.Context(), roomID, 50)
+	messages, err := h.repo.ListByRoom(r.Context(), roomID, 0)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	var response []MessageResponse
+	response := make([]MessageResponse, 0, len(messages))
 
 	for _, msg := range messages {
 		response = append(response, toResponse(msg))
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
 func toResponse(msg *domain.Message) MessageResponse {
 	return MessageResponse{
 		ID:        msg.ID.String(),
+		SenderID:  msg.SenderID.String(),
 		Content:   msg.Content,
 		Type:      msg.MessageType,
 		CreatedAt: msg.CreatedAt,
+		ExpiresAt: msg.ExpiresAt,
 	}
 }
 

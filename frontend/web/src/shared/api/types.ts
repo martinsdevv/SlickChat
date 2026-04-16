@@ -78,9 +78,11 @@ export type WSTicketResponse = {
 
 export type MessageHistoryItem = {
   id: string;
+  sender_id?: string;
   content: string;
   type: string;
   created_at: string;
+  expires_at?: string | null;
 };
 
 export type WsOutEvent =
@@ -97,6 +99,10 @@ export type WsInboundPayload = {
   send_message: {
     room_id: string;
     content: string;
+  };
+  delete_message: {
+    room_id: string;
+    message_id: string;
   };
   message_delivered: {
     room_id: string;

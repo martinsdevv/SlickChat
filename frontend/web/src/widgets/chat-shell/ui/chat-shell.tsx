@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useChatStore, type ChatMessage } from "../../../features/chat/store";
 import { filterRooms, useRoomsStore } from "../../../features/rooms/store";
 import { useSessionStore } from "../../../features/session/store";
@@ -81,13 +81,12 @@ export function ChatShell() {
     disconnect,
     loadRoomHistory,
     sendMessage,
+    deleteMessages,
     markMessageRead,
   } = useChatStore();
   const {
-    isSidebarOpen,
     isRightPanelOpen,
     mobileView,
-    toggleSidebar,
     toggleRightPanel,
     setMobileView,
   } = useUIStore();
@@ -101,6 +100,9 @@ export function ChatShell() {
   const [newRoomTTL, setNewRoomTTL] = useState(60);
   const [newRoomZeroLogging, setNewRoomZeroLogging] = useState(false);
   const [createRoomFeedback, setCreateRoomFeedback] = useState<string | null>(null);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const activeRoom = rooms.find((room) => room.room_id === activeRoomId) ?? null;
   const roomMessages = useMemo(
@@ -145,19 +147,34 @@ export function ChatShell() {
     },
     [clock, messagesByRoom],
   );
+  const orderedRooms = useMemo(() => {
+    const roomOrder = new Map(filteredRooms.map((room, index) => [room.room_id, index]));
+    return [...filteredRooms].sort((a, b) => {
+      const aLast = lastMessageByRoom[a.room_id];
+      const bLast = lastMessageByRoom[b.room_id];
+      const aTime = aLast ? Date.parse(aLast.createdAt) : Number.NEGATIVE_INFINITY;
+      const bTime = bLast ? Date.parse(bLast.createdAt) : Number.NEGATIVE_INFINITY;
+
+      if (aTime !== bTime) {
+        return bTime - aTime;
+      }
+
+      return (roomOrder.get(a.room_id) ?? 0) - (roomOrder.get(b.room_id) ?? 0);
+    });
+  }, [filteredRooms, lastMessageByRoom]);
   const myMembership = useMemo(
     () => roomMembers.find((member) => member.user_id === user.userId) ?? null,
     [roomMembers, user.userId],
   );
   const canAddMembers = myMembership?.role === "ADMIN";
+  const canDeleteAnyMessage = myMembership?.role === "ADMIN";
 
   useEffect(() => {
     if (!token) {
       return;
     }
-    reset();
     void loadRooms(token).catch(() => undefined);
-  }, [loadRooms, reset, token]);
+  }, [loadRooms, token]);
 
   useEffect(() => {
     if (!token) {
@@ -181,6 +198,24 @@ export function ChatShell() {
   }, [activeRoom, joinRoom, loadMembers, loadRoomHistory, token]);
 
   useEffect(() => {
+    if (!token || rooms.length === 0) {
+      return;
+    }
+
+    const roomIdsWithoutHistory = rooms
+      .map((room) => room.room_id)
+      .filter((roomId) => messagesByRoom[roomId] === undefined);
+
+    if (roomIdsWithoutHistory.length === 0) {
+      return;
+    }
+
+    void Promise.allSettled(
+      roomIdsWithoutHistory.map((roomId) => loadRoomHistory(roomId, token)),
+    );
+  }, [loadRoomHistory, messagesByRoom, rooms, token]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -196,6 +231,25 @@ export function ChatShell() {
         markMessageRead(activeRoomId, message.id);
       });
   }, [activeRoomId, markMessageRead, visibleRoomMessages]);
+
+  useEffect(() => {
+    const anchor = messagesEndRef.current;
+    if (!anchor) {
+      return;
+    }
+    const frame1 = window.requestAnimationFrame(() => {
+      const frame2 = window.requestAnimationFrame(() => {
+        anchor.scrollIntoView({ block: "end" });
+      });
+      return () => window.cancelAnimationFrame(frame2);
+    });
+    return () => window.cancelAnimationFrame(frame1);
+  }, [activeRoomId, mobileView, roomMessages.length]);
+
+  useEffect(() => {
+    setIsSelectionMode(false);
+    setSelectedMessageIds([]);
+  }, [activeRoomId]);
 
   function resetCreateRoomForm() {
     setNewRoomName("");
@@ -262,6 +316,52 @@ export function ChatShell() {
     }
   }
 
+  function canDeleteMessage(message: ChatMessage) {
+    return canDeleteAnyMessage || message.isOwn;
+  }
+
+  function toggleMessageSelection(messageId: string) {
+    setSelectedMessageIds((current) =>
+      current.includes(messageId)
+        ? current.filter((id) => id !== messageId)
+        : [...current, messageId],
+    );
+  }
+
+  function handleDeleteSelectedMessages() {
+    if (!activeRoomId || selectedMessageIds.length === 0) {
+      return;
+    }
+    const deletableIds = visibleRoomMessages
+      .filter((message) => selectedMessageIds.includes(message.id) && canDeleteMessage(message))
+      .map((message) => message.id);
+    if (deletableIds.length === 0) {
+      return;
+    }
+    deleteMessages(activeRoomId, deletableIds);
+    setSelectedMessageIds([]);
+    setIsSelectionMode(false);
+  }
+
+  function openRoomInfoPanel() {
+    if (!activeRoom) {
+      return;
+    }
+    if (!isRightPanelOpen) {
+      toggleRightPanel();
+    }
+    setMobileView("info");
+  }
+
+  function closeRoomInfoPanel() {
+    if (isRightPanelOpen) {
+      toggleRightPanel();
+    }
+    if (mobileView === "info") {
+      setMobileView("chat");
+    }
+  }
+
   if (!user) {
     return null;
   }
@@ -269,10 +369,8 @@ export function ChatShell() {
   return (
     <div className="grid h-dvh grid-cols-1 overflow-hidden bg-[#07080d] lg:grid-cols-[320px_1fr_340px]">
       <aside
-        className={`${
-          isSidebarOpen ? "block" : "hidden"
-        } min-h-0 border-r border-white/8 bg-[#0d0e12] px-4 py-4 ${
-          mobileView === "chat" ? "hidden lg:block" : "block"
+        className={`min-h-0 border-r border-white/8 bg-[#0d0e12] px-4 py-4 ${
+          mobileView === "rooms" ? "block" : "hidden lg:block"
         }`}
       >
         <div className="flex h-full min-h-0 flex-col">
@@ -387,7 +485,7 @@ export function ChatShell() {
               Carregando salas...
             </p>
           ) : null}
-          {filteredRooms.map((room) => {
+          {orderedRooms.map((room) => {
             const isActive = room.room_id === activeRoomId;
             return (
               <button
@@ -435,32 +533,49 @@ export function ChatShell() {
 
       <main
         className={`flex min-h-0 flex-col bg-[#07080d] ${
-          mobileView === "rooms" ? "hidden lg:flex" : "flex"
+          mobileView === "chat" ? "flex" : "hidden lg:flex"
         }`}
       >
         <header className="flex items-center justify-between border-b border-white/8 px-4 py-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-[var(--text-1)]">
-              {activeRoom?.name ?? "Selecione uma sala"}
-            </h1>
-            {activeRoom ? (
-              <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-wide">
-                <span
-                  className={`rounded px-1.5 py-0.5 ${
-                    activeRoom.type === "PRIVATE"
-                      ? "bg-fuchsia-500/20 text-fuchsia-300"
-                      : activeRoom.type === "PUBLIC"
-                        ? "bg-emerald-500/20 text-emerald-300"
-                        : "bg-amber-500/20 text-amber-300"
-                  }`}
-                >
-                  {activeRoom.type}
-                </span>
-                {activeRoom.zero_logging ? (
-                  <span className="rounded bg-[#7a00ff]/20 px-1.5 py-0.5 text-[#d3b3ff]">ZERO</span>
-                ) : null}
-              </div>
-            ) : null}
+          <div className="flex min-w-0 items-start gap-2">
+            <button
+              type="button"
+              className="mt-1 rounded-md border border-white/15 px-2 py-1 text-xs text-[var(--text-2)] lg:hidden"
+              onClick={() => setMobileView("rooms")}
+              aria-label="Voltar para salas"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="min-w-0 text-left"
+              onClick={openRoomInfoPanel}
+              disabled={!activeRoom}
+            >
+              <h1 className="truncate text-2xl font-semibold text-[var(--text-1)]">
+                {activeRoom?.name ?? "Selecione uma sala"}
+              </h1>
+              {activeRoom ? (
+                <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-wide">
+                  <span
+                    className={`rounded px-1.5 py-0.5 ${
+                      activeRoom.type === "PRIVATE"
+                        ? "bg-fuchsia-500/20 text-fuchsia-300"
+                        : activeRoom.type === "PUBLIC"
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : "bg-amber-500/20 text-amber-300"
+                    }`}
+                  >
+                    {activeRoom.type}
+                  </span>
+                  {activeRoom.zero_logging ? (
+                    <span className="rounded bg-[#7a00ff]/20 px-1.5 py-0.5 text-[#d3b3ff]">ZERO</span>
+                  ) : null}
+                </div>
+              ) : null}
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <span
@@ -472,24 +587,28 @@ export function ChatShell() {
             >
               {connectionStatus}
             </span>
+            {activeRoom ? (
+              <button
+                type="button"
+                className="rounded-md border border-white/20 px-2 py-1 text-xs text-[var(--text-2)]"
+                onClick={() => {
+                  setIsSelectionMode((current) => !current);
+                  setSelectedMessageIds([]);
+                }}
+              >
+                {isSelectionMode ? "Cancelar seleção" : "Selecionar"}
+              </button>
+            ) : null}
             <button
               type="button"
-              className="rounded-md border border-white/15 px-2 py-1 text-xs text-[var(--text-2)] lg:hidden"
-              onClick={() => setMobileView("rooms")}
+              className="rounded-md border border-white/20 p-2 text-xs"
+              onClick={openRoomInfoPanel}
+              aria-label="Abrir informações da sala"
             >
-              Voltar
-            </button>
-            <button
-              className="rounded-md border border-white/20 px-3 py-2 text-xs"
-              onClick={toggleSidebar}
-            >
-              Menu
-            </button>
-            <button
-              className="rounded-md border border-white/20 px-3 py-2 text-xs"
-              onClick={toggleRightPanel}
-            >
-              Painel
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 10v6M12 7h.01" />
+              </svg>
             </button>
           </div>
         </header>
@@ -499,14 +618,29 @@ export function ChatShell() {
             Aviso: nada do que voce diz aqui é salvo
           </div>
         ) : null}
+        {isSelectionMode ? (
+          <div className="flex items-center justify-between border-b border-white/8 bg-[#10131a] px-4 py-2 text-xs text-[var(--text-2)]">
+            <span>{selectedMessageIds.length} mensagem(ns) selecionada(s)</span>
+            <button
+              type="button"
+              onClick={handleDeleteSelectedMessages}
+              disabled={selectedMessageIds.length === 0}
+              className="rounded-md border border-red-400/40 px-2 py-1 text-red-300 disabled:opacity-50"
+            >
+              Apagar selecionadas
+            </button>
+          </div>
+        ) : null}
 
         <section className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-4 py-5">
           {visibleRoomMessages.map((message) => {
             const visual = getTemporaryVisualState(message, clock);
-            const presence = presenceByUserId[message.authorId] ?? "unknown";
+            const presence = presenceByUserId[message.authorId] ?? "offline";
             const displayHandle =
               memberHandleByUserId[message.authorId] ??
               (message.isOwn ? user.handle : message.authorHandle);
+            const isDeletable = canDeleteMessage(message);
+            const isSelected = selectedMessageIds.includes(message.id);
             return (
               <article
                 key={message.id}
@@ -514,10 +648,27 @@ export function ChatShell() {
                   message.isOwn
                     ? "ml-auto border-[#6f00ff]/50 bg-gradient-to-br from-[#7a00ff] to-[#9400ff] text-white"
                     : "border-white/10 bg-[#1a1b20] text-[var(--text-1)]"
-                } ${visual.className}`}
+                } ${visual.className} ${
+                  isSelectionMode && isSelected ? "ring-2 ring-red-400/70" : ""
+                }`}
                 style={visual.style as CSSProperties}
+                onClick={() => {
+                  if (isSelectionMode && isDeletable) {
+                    toggleMessageSelection(message.id);
+                  }
+                }}
               >
                 <div className="mb-1 flex items-center gap-3 text-xs">
+                  {isSelectionMode ? (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={!isDeletable}
+                      onChange={() => toggleMessageSelection(message.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      aria-label={`Selecionar mensagem ${message.id}`}
+                    />
+                  ) : null}
                   <span className="opacity-80">{displayHandle}</span>
                   <span
                     className={`ml-auto ${
@@ -557,6 +708,7 @@ export function ChatShell() {
               Sem mensagens ainda nesta sala.
             </p>
           ) : null}
+          <div ref={messagesEndRef} aria-hidden />
         </section>
 
         <footer className="border-t border-white/10 px-4 py-3">
@@ -617,14 +769,30 @@ export function ChatShell() {
         </footer>
       </main>
 
-      <aside className={`${isRightPanelOpen ? "hidden lg:block" : "hidden"} border-l border-white/8 bg-[#0c0d12] p-4`}>
+      <aside
+        className={`border-l border-white/8 bg-[#0c0d12] p-4 ${
+          isRightPanelOpen
+            ? mobileView === "info"
+              ? "block"
+              : "hidden lg:block"
+            : "hidden"
+        }`}
+      >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--text-1)]">Info da Sala</h2>
-          <button
-            type="button"
-            className="text-sm text-[var(--text-3)]"
-            onClick={toggleRightPanel}
-          >
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-md border border-white/15 px-2 py-1 text-xs text-[var(--text-2)] lg:hidden"
+              onClick={() => setMobileView("chat")}
+              aria-label="Voltar para chat"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <h2 className="text-lg font-semibold text-[var(--text-1)]">Info da Sala</h2>
+          </div>
+          <button type="button" className="text-sm text-[var(--text-3)]" onClick={closeRoomInfoPanel}>
             ✕
           </button>
         </div>

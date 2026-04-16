@@ -34,8 +34,9 @@ type ChatState = {
   setDraft: (roomId: string, value: string) => void;
   connect: (token: string) => Promise<void>;
   disconnect: () => void;
-  loadRoomHistory: (roomId: string, token: string) => Promise<void>;
+  loadRoomHistory: (roomId: string, token: string) => Promise<boolean>;
   sendMessage: (roomId: string) => void;
+  deleteMessages: (roomId: string, messageIds: string[]) => void;
   markMessageRead: (roomId: string, messageId: string) => void;
   markMessageDelivered: (roomId: string, messageId: string) => void;
 };
@@ -43,6 +44,15 @@ type ChatState = {
 let wsClient: WsClient | null = null;
 let reconnectTimer: number | null = null;
 let reconnectAttempts = 0;
+const presenceTimeouts = new Map<string, number>();
+const PRESENCE_ONLINE_TTL_MS = 45_000;
+
+function clearPresenceTimeouts() {
+  presenceTimeouts.forEach((timeoutId) => {
+    window.clearTimeout(timeoutId);
+  });
+  presenceTimeouts.clear();
+}
 
 function appendMessage(
   messagesByRoom: Record<string, ChatMessage[]>,
@@ -215,7 +225,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     wsClient = createWsClient(ticket.ticket, {
       onOpen: () => {
         reconnectAttempts = 0;
-        set({ connectionStatus: "connected", connectionError: null });
+        const currentUserId = useSessionStore.getState().user?.userId;
+        set((state) => ({
+          connectionStatus: "connected",
+          connectionError: null,
+          presenceByUserId: currentUserId
+            ? {
+                ...state.presenceByUserId,
+                [currentUserId]: "online",
+              }
+            : state.presenceByUserId,
+        }));
       },
       onClose: () => {
         const currentToken = useSessionStore.getState().token;
@@ -243,6 +263,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
 
           set((state) => {
+            const existingPresenceTimeout = presenceTimeouts.get(message.authorId);
+            if (existingPresenceTimeout) {
+              window.clearTimeout(existingPresenceTimeout);
+            }
+            const timeoutId = window.setTimeout(() => {
+              set((currentState) => ({
+                presenceByUserId: {
+                  ...currentState.presenceByUserId,
+                  [message.authorId]: "offline",
+                },
+              }));
+              presenceTimeouts.delete(message.authorId);
+            }, PRESENCE_ONLINE_TTL_MS);
+            presenceTimeouts.set(message.authorId, timeoutId);
+
             if (message.isOwn) {
               const { messagesByRoom, reconciledLocalId } = upsertOwnMessageFromServer(
                 state.messagesByRoom,
@@ -360,57 +395,93 @@ export const useChatStore = create<ChatState>((set, get) => ({
       reconnectTimer = null;
     }
     reconnectAttempts = 0;
+    clearPresenceTimeouts();
     wsClient?.close();
     wsClient = null;
     set({ connectionStatus: "idle" });
   },
   loadRoomHistory: async (roomId, token) => {
     if (!roomId || !token) {
-      return;
+      return false;
     }
 
-    let historyPayload: MessageHistoryItem[] | unknown;
-    try {
-      historyPayload = await apiRequest<MessageHistoryItem[] | unknown>("/messages", {
-        token,
-        query: { room_id: roomId },
-      });
-    } catch (error) {
+    const maxAttempts = 4;
+    let lastError: unknown = null;
+    let historyPayload: MessageHistoryItem[] | unknown = [];
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        historyPayload = await apiRequest<MessageHistoryItem[] | unknown>("/messages", {
+          token,
+          query: { room_id: roomId },
+        });
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => window.setTimeout(resolve, attempt * 500));
+        }
+      }
+    }
+
+    if (lastError) {
       set({
         connectionError:
-          error instanceof Error ? error.message : "history_load_failed",
+          lastError instanceof Error ? lastError.message : "history_load_failed",
       });
-      return;
+      return false;
     }
 
-    const history = Array.isArray(historyPayload) ? historyPayload : [];
+    let parsedPayload: unknown = historyPayload;
+    if (typeof historyPayload === "string") {
+      try {
+        parsedPayload = JSON.parse(historyPayload);
+      } catch {
+        parsedPayload = [];
+      }
+    }
+    const history = Array.isArray(parsedPayload) ? parsedPayload : [];
 
     const currentUserId = useSessionStore.getState().user?.userId ?? "";
-    const mapped: ChatMessage[] = history.map((item) => ({
-      id: item.id,
-      roomId,
-      authorId: "system",
-      authorHandle: "sistema",
-      content: item.content,
-      status: "read",
-      createdAt: item.created_at,
-      isOwn: false,
-      expiresAt: null,
-      ttlSeconds: null,
-      isZeroLogging: false,
-      isTemporary: false,
-    }));
+    const currentHandle = useSessionStore.getState().user?.handle ?? "";
+    const room = useRoomsStore.getState().rooms.find((r) => r.room_id === roomId);
+    const mapped: ChatMessage[] = history.map((item) => {
+      const senderId = typeof item.sender_id === "string" ? item.sender_id : "";
+      const isOwn = senderId !== "" && senderId === currentUserId;
+      const expiresAt = item.expires_at ?? null;
+      const hasExpiration = expiresAt !== null;
+      return {
+        id: item.id,
+        roomId,
+        authorId: senderId || "unknown",
+        authorHandle: isOwn
+          ? currentHandle
+          : senderId
+            ? `user#${senderId.slice(0, 4)}`
+            : "desconhecido",
+        content: item.content,
+        status: "read" as const,
+        createdAt: item.created_at,
+        isOwn,
+        expiresAt,
+        ttlSeconds: room?.ttl ?? null,
+        isZeroLogging: room?.zero_logging ?? false,
+        isTemporary: hasExpiration || (room?.type === "TEMPORARY"),
+      };
+    });
+    const sortedMapped = [...mapped].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
     set((state) => ({
       messagesByRoom: {
         ...state.messagesByRoom,
-        [roomId]: mapped.length > 0 ? mapped : state.messagesByRoom[roomId] ?? [],
+        [roomId]: sortedMapped,
       },
       presenceByUserId: {
         ...state.presenceByUserId,
         [currentUserId]: "online",
       },
     }));
+    return true;
   },
   sendMessage: (roomId) => {
     const draft = get().draftByRoom[roomId]?.trim();
@@ -456,6 +527,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
     wsClient.send("send_message", {
       room_id: roomId,
       content: draft,
+    });
+  },
+  deleteMessages: (roomId, messageIds) => {
+    if (!roomId || messageIds.length === 0) {
+      return;
+    }
+    const uniqueMessageIds = [...new Set(messageIds)];
+
+    // Optimistic UI: remove messages immediately from local state.
+    set((state) => ({
+      messagesByRoom: {
+        ...state.messagesByRoom,
+        [roomId]: (state.messagesByRoom[roomId] ?? []).filter(
+          (message) => !uniqueMessageIds.includes(message.id),
+        ),
+      },
+    }));
+
+    if (!wsClient || wsClient.socket.readyState !== WebSocket.OPEN) {
+      set({ connectionError: "offline_delete_blocked" });
+      return;
+    }
+
+    uniqueMessageIds.forEach((messageId) => {
+      wsClient?.send("delete_message", {
+        room_id: roomId,
+        message_id: messageId,
+      });
     });
   },
   markMessageRead: (roomId, messageId) => {

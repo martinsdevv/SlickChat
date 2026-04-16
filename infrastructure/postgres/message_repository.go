@@ -84,16 +84,30 @@ func (r *MessageRepository) GetByID(ctx context.Context, messageID uuid.UUID) (*
 }
 
 func (r *MessageRepository) ListByRoom(ctx context.Context, roomID uuid.UUID, limit int) ([]*domain.Message, error) {
-	query := `
-		SELECT id, room_id, sender_id, content, message_type, ttl, destroy_after_read, created_at, expires_at
-		FROM messages
-		WHERE room_id = $1
-		AND (expires_at IS NULL OR expires_at > NOW())
-		ORDER BY created_at DESC
-		LIMIT $2
-	`
-
-	rows, err := r.db.QueryContext(ctx, query, roomID, limit)
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if limit > 0 {
+		query := `
+			SELECT id, room_id, sender_id, content, message_type, ttl, destroy_after_read, created_at, expires_at
+			FROM messages
+			WHERE room_id = $1
+			AND (expires_at IS NULL OR expires_at > NOW())
+			ORDER BY created_at DESC
+			LIMIT $2
+		`
+		rows, err = r.db.QueryContext(ctx, query, roomID, limit)
+	} else {
+		query := `
+			SELECT id, room_id, sender_id, content, message_type, ttl, destroy_after_read, created_at, expires_at
+			FROM messages
+			WHERE room_id = $1
+			AND (expires_at IS NULL OR expires_at > NOW())
+			ORDER BY created_at DESC
+		`
+		rows, err = r.db.QueryContext(ctx, query, roomID)
+	}
 	if err != nil {
 		return nil, err
 	}
