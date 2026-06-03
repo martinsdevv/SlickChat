@@ -2,12 +2,16 @@ import { create } from "zustand";
 import { apiRequest } from "../../shared/api/http-client";
 import type { MessageHistoryItem, WSTicketResponse } from "../../shared/api/types";
 import { createWsClient, type WsClient, type WsEnvelope } from "../../shared/api/ws-client";
+import {
+  clampMessageContent,
+  MAX_MESSAGE_CONTENT_LENGTH,
+} from "../../shared/constants/messages";
 import { useRoomsStore } from "../rooms/store";
 import { useSessionStore } from "../session/store";
 
 type DeliveryStatus = "sending" | "sent" | "delivered" | "read" | "failed";
 type PresenceStatus = "online" | "offline" | "unknown";
-type ConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "offline";
+export type ConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "offline";
 
 export type ChatMessage = {
   id: string;
@@ -15,6 +19,9 @@ export type ChatMessage = {
   authorId: string;
   authorHandle: string;
   content: string;
+  messageType: "TEXT" | "IMAGE";
+  imageObjectKey?: string;
+  imagePreviewUrl?: string;
   status: DeliveryStatus;
   createdAt: string;
   isOwn: boolean;
@@ -24,18 +31,27 @@ export type ChatMessage = {
   isTemporary: boolean;
 };
 
+type PendingAttachment = {
+  file: File;
+  previewUrl: string;
+};
+
 type ChatState = {
   messagesByRoom: Record<string, ChatMessage[]>;
   pendingAckIds: string[];
   draftByRoom: Record<string, string>;
+  pendingAttachmentByRoom: Record<string, PendingAttachment | undefined>;
   connectionStatus: ConnectionStatus;
   connectionError: string | null;
   presenceByUserId: Record<string, PresenceStatus>;
   setDraft: (roomId: string, value: string) => void;
+  setPendingAttachment: (roomId: string, file: File) => void;
+  clearPendingAttachment: (roomId: string) => void;
   connect: (token: string) => Promise<void>;
   disconnect: () => void;
   loadRoomHistory: (roomId: string, token: string) => Promise<boolean>;
   sendMessage: (roomId: string) => void;
+  sendComposer: (roomId: string) => void;
   deleteMessages: (roomId: string, messageIds: string[]) => void;
   markMessageRead: (roomId: string, messageId: string) => void;
   markMessageDelivered: (roomId: string, messageId: string) => void;
@@ -77,14 +93,49 @@ function upsertOwnMessageFromServer(
   messageFromServer: ChatMessage,
 ) {
   const roomMessages = messagesByRoom[messageFromServer.roomId] ?? [];
-  if (roomMessages.some((item) => item.id === messageFromServer.id)) {
+  const existingIndex = roomMessages.findIndex((item) => item.id === messageFromServer.id);
+  if (existingIndex !== -1) {
+    const existing = roomMessages[existingIndex];
+    if (
+      messageFromServer.messageType === "IMAGE" &&
+      existing.messageType === "IMAGE"
+    ) {
+      const merged = mergeImageMessageFromServer(existing, messageFromServer);
+      if (
+        merged.content !== existing.content ||
+        merged.imageObjectKey !== existing.imageObjectKey
+      ) {
+        const nextRoomMessages = roomMessages.map((item, index) =>
+          index === existingIndex ? merged : item,
+        );
+        return {
+          messagesByRoom: {
+            ...messagesByRoom,
+            [messageFromServer.roomId]: nextRoomMessages,
+          },
+          reconciledLocalId: null as string | null,
+        };
+      }
+    }
     return { messagesByRoom, reconciledLocalId: null as string | null };
   }
 
   const serverTimestamp = Date.parse(messageFromServer.createdAt);
   const optimisticIndex = roomMessages.findIndex((item) => {
-    if (!item.isOwn || !item.id.startsWith("local-")) {
+    if (!item.isOwn) {
       return false;
+    }
+    if (item.id === messageFromServer.id) {
+      return true;
+    }
+    if (!item.id.startsWith("local-")) {
+      return false;
+    }
+    if (item.messageType !== messageFromServer.messageType) {
+      return false;
+    }
+    if (item.messageType === "IMAGE") {
+      return item.imageObjectKey === messageFromServer.imageObjectKey;
     }
     if (item.content !== messageFromServer.content) {
       return false;
@@ -105,16 +156,18 @@ function upsertOwnMessageFromServer(
   }
 
   const reconciledLocalId = roomMessages[optimisticIndex].id;
+  const optimistic = roomMessages[optimisticIndex];
   const nextRoomMessages = roomMessages.map((item, index) =>
     index === optimisticIndex
-      ? {
-          ...messageFromServer,
-          // Preserve advanced status if it already progressed locally.
-          status:
-            item.status === "delivered" || item.status === "read"
-              ? item.status
-              : messageFromServer.status,
-        }
+      ? messageFromServer.messageType === "IMAGE"
+        ? mergeImageMessageFromServer(optimistic, messageFromServer)
+        : {
+            ...messageFromServer,
+            status:
+              item.status === "delivered" || item.status === "read"
+                ? item.status
+                : messageFromServer.status,
+          }
       : item,
   );
 
@@ -150,6 +203,56 @@ function scheduleReconnect(token: string, connect: (token: string) => Promise<vo
   }, waitMs);
 }
 
+function parseImageMessageFields(
+  messageType: "TEXT" | "IMAGE",
+  content: string,
+  attachmentObjectKey: string,
+  explicitCaption?: string,
+): { caption: string; imageObjectKey?: string } | null {
+  if (messageType !== "IMAGE") {
+    return { caption: explicitCaption?.trim() || content };
+  }
+
+  const key =
+    attachmentObjectKey ||
+    (content.startsWith("messages/") ? content : "");
+  if (!key) {
+    return null;
+  }
+
+  let caption = explicitCaption?.trim() ?? "";
+  if (!caption) {
+    if (attachmentObjectKey.length > 0 && content && !content.startsWith("messages/")) {
+      caption = content;
+    } else if (!content.startsWith("messages/")) {
+      caption = content;
+    }
+  }
+
+  return { caption, imageObjectKey: key };
+}
+
+function mergeImageMessageFromServer(
+  optimistic: ChatMessage,
+  fromServer: ChatMessage,
+): ChatMessage {
+  const serverCaption = fromServer.content.trim();
+  const optimisticCaption = optimistic.content.trim();
+  const caption =
+    serverCaption || optimisticCaption || fromServer.content || optimistic.content;
+
+  return {
+    ...fromServer,
+    content: caption,
+    imageObjectKey: fromServer.imageObjectKey ?? optimistic.imageObjectKey,
+    imagePreviewUrl: fromServer.imagePreviewUrl ?? optimistic.imagePreviewUrl,
+    status:
+      optimistic.status === "delivered" || optimistic.status === "read"
+        ? optimistic.status
+        : fromServer.status,
+  };
+}
+
 function createMessageFromGateway(
   payload: Record<string, unknown>,
   currentUserId: string,
@@ -157,8 +260,21 @@ function createMessageFromGateway(
   const roomId = String(payload.room_id ?? "");
   const messageId = String(payload.message_id ?? "");
   const senderId = String(payload.sender_id ?? "");
-  const content = String(payload.content ?? "");
-  if (!roomId || !messageId || !content) {
+  const messageTypeRaw = String(payload.message_type ?? "TEXT").toUpperCase();
+  const messageType = messageTypeRaw === "IMAGE" ? "IMAGE" : "TEXT";
+  const rawContent = String(payload.content ?? "");
+  const attachmentObjectKey = String(payload.attachment_object_key ?? "");
+  const explicitCaption = String(payload.caption ?? "");
+  const parsed = parseImageMessageFields(
+    messageType,
+    rawContent,
+    attachmentObjectKey,
+    explicitCaption,
+  );
+  if (!roomId || !messageId || !parsed) {
+    return null;
+  }
+  if (messageType === "TEXT" && !parsed.caption) {
     return null;
   }
 
@@ -180,7 +296,9 @@ function createMessageFromGateway(
     roomId,
     authorId: senderId,
     authorHandle: senderId === currentUserId ? "você" : `user#${senderId.slice(0, 4)}`,
-    content,
+    content: clampMessageContent(parsed.caption),
+    messageType,
+    imageObjectKey: parsed.imageObjectKey,
     status: senderId === currentUserId ? "sent" : "delivered",
     createdAt: sentAt,
     isOwn: senderId === currentUserId,
@@ -191,10 +309,17 @@ function createMessageFromGateway(
   };
 }
 
+function revokePendingAttachment(pending?: PendingAttachment) {
+  if (pending?.previewUrl.startsWith("blob:")) {
+    URL.revokeObjectURL(pending.previewUrl);
+  }
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   messagesByRoom: {},
   pendingAckIds: [],
   draftByRoom: {},
+  pendingAttachmentByRoom: {},
   connectionStatus: "idle",
   connectionError: null,
   presenceByUserId: {},
@@ -205,6 +330,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
         [roomId]: value,
       },
     }));
+  },
+  setPendingAttachment: (roomId, file) => {
+    const previewUrl = URL.createObjectURL(file);
+    set((state) => {
+      revokePendingAttachment(state.pendingAttachmentByRoom[roomId]);
+      return {
+        pendingAttachmentByRoom: {
+          ...state.pendingAttachmentByRoom,
+          [roomId]: { file, previewUrl },
+        },
+      };
+    });
+  },
+  clearPendingAttachment: (roomId) => {
+    set((state) => {
+      revokePendingAttachment(state.pendingAttachmentByRoom[roomId]);
+      const next = { ...state.pendingAttachmentByRoom };
+      delete next[roomId];
+      return { pendingAttachmentByRoom: next };
+    });
   },
   connect: async (token) => {
     if (wsClient?.socket.readyState === WebSocket.OPEN) {
@@ -307,6 +452,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           if (!message.isOwn) {
             get().markMessageDelivered(message.roomId, message.id);
+            const activeRoomId = useRoomsStore.getState().activeRoomId;
+            if (message.roomId !== activeRoomId) {
+              useRoomsStore.getState().bumpRoomUnread(message.roomId);
+            }
           }
           return;
         }
@@ -445,29 +594,44 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const currentUserId = useSessionStore.getState().user?.userId ?? "";
     const currentHandle = useSessionStore.getState().user?.handle ?? "";
     const room = useRoomsStore.getState().rooms.find((r) => r.room_id === roomId);
-    const mapped: ChatMessage[] = history.map((item) => {
+    const mapped: ChatMessage[] = history.flatMap((item) => {
       const senderId = typeof item.sender_id === "string" ? item.sender_id : "";
       const isOwn = senderId !== "" && senderId === currentUserId;
       const expiresAt = item.expires_at ?? null;
       const hasExpiration = expiresAt !== null;
-      return {
-        id: item.id,
-        roomId,
-        authorId: senderId || "unknown",
-        authorHandle: isOwn
-          ? currentHandle
-          : senderId
-            ? `user#${senderId.slice(0, 4)}`
-            : "desconhecido",
-        content: item.content,
-        status: "read" as const,
-        createdAt: item.created_at,
-        isOwn,
-        expiresAt,
-        ttlSeconds: room?.ttl ?? null,
-        isZeroLogging: room?.zero_logging ?? false,
-        isTemporary: hasExpiration || (room?.type === "TEMPORARY"),
-      };
+      const messageType = item.type === "IMAGE" ? "IMAGE" : "TEXT";
+      const parsed = parseImageMessageFields(
+        messageType,
+        item.content,
+        item.attachment_object_key ?? "",
+        item.caption,
+      );
+      if (messageType === "IMAGE" && !parsed) {
+        return [];
+      }
+
+      return [
+        {
+          id: item.id,
+          roomId,
+          authorId: senderId || "unknown",
+          authorHandle: isOwn
+            ? currentHandle
+            : senderId
+              ? `user#${senderId.slice(0, 4)}`
+              : "desconhecido",
+          content: clampMessageContent(parsed?.caption ?? item.content),
+          messageType,
+          imageObjectKey: parsed?.imageObjectKey,
+          status: "read" as const,
+          createdAt: item.created_at,
+          isOwn,
+          expiresAt,
+          ttlSeconds: room?.ttl ?? null,
+          isZeroLogging: room?.zero_logging ?? false,
+          isTemporary: hasExpiration || (room?.type === "TEMPORARY"),
+        },
+      ];
     });
     const sortedMapped = [...mapped].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
@@ -489,6 +653,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!draft || !sessionUser) {
       return;
     }
+    if (draft.length > MAX_MESSAGE_CONTENT_LENGTH) {
+      set({ connectionError: "content_too_long" });
+      return;
+    }
 
     if (!wsClient || wsClient.socket.readyState !== WebSocket.OPEN) {
       set({ connectionError: "offline_send_blocked" });
@@ -506,6 +674,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       authorId: sessionUser.userId,
       authorHandle: sessionUser.handle,
       content: draft,
+      messageType: "TEXT",
       status: "sending",
       createdAt: new Date().toISOString(),
       isOwn: true,
@@ -528,6 +697,101 @@ export const useChatStore = create<ChatState>((set, get) => ({
       room_id: roomId,
       content: draft,
     });
+  },
+  sendComposer: async (roomId) => {
+    const pending = get().pendingAttachmentByRoom[roomId];
+    if (pending) {
+      const caption = get().draftByRoom[roomId]?.trim() ?? "";
+      if (caption.length > MAX_MESSAGE_CONTENT_LENGTH) {
+        set({ connectionError: "content_too_long" });
+        return;
+      }
+      const sessionUser = useSessionStore.getState().user;
+      const authToken = useSessionStore.getState().token;
+      if (!sessionUser || !authToken) {
+        return;
+      }
+
+      if (!wsClient || wsClient.socket.readyState !== WebSocket.OPEN) {
+        set({ connectionError: "offline_send_blocked" });
+        return;
+      }
+
+      const messageId = crypto.randomUUID();
+      const { file } = pending;
+      const messagePreviewUrl = URL.createObjectURL(file);
+      const room = useRoomsStore.getState().rooms.find((item) => item.room_id === roomId) ?? null;
+      const ttlSeconds = room && room.ttl > 0 ? room.ttl : null;
+      const expiresAt =
+        ttlSeconds !== null ? new Date(Date.now() + ttlSeconds * 1000).toISOString() : null;
+
+      const optimisticMessage: ChatMessage = {
+        id: messageId,
+        roomId,
+        authorId: sessionUser.userId,
+        authorHandle: sessionUser.handle,
+        content: caption,
+        messageType: "IMAGE",
+        imagePreviewUrl: messagePreviewUrl,
+        status: "sending",
+        createdAt: new Date().toISOString(),
+        isOwn: true,
+        expiresAt,
+        ttlSeconds,
+        isZeroLogging: Boolean(room?.zero_logging),
+        isTemporary: Boolean(ttlSeconds && ttlSeconds > 0),
+      };
+
+      set((state) => {
+        revokePendingAttachment(state.pendingAttachmentByRoom[roomId]);
+        const nextPending = { ...state.pendingAttachmentByRoom };
+        delete nextPending[roomId];
+        return {
+          messagesByRoom: appendMessage(state.messagesByRoom, roomId, optimisticMessage),
+          pendingAckIds: [...state.pendingAckIds, messageId],
+          pendingAttachmentByRoom: nextPending,
+          draftByRoom: { ...state.draftByRoom, [roomId]: "" },
+        };
+      });
+
+      try {
+        const { uploadMessageImage } = await import("../media/upload-message-image");
+        const uploaded = await uploadMessageImage(authToken, roomId, messageId, file);
+
+        set((state) => ({
+          messagesByRoom: {
+            ...state.messagesByRoom,
+            [roomId]: (state.messagesByRoom[roomId] ?? []).map((message) =>
+              message.id === messageId
+                ? { ...message, imageObjectKey: uploaded.object_key }
+                : message,
+            ),
+          },
+        }));
+
+        wsClient.send("send_message", {
+          room_id: roomId,
+          content: caption,
+          message_id: messageId,
+          message_type: "IMAGE",
+          object_key: uploaded.object_key,
+        });
+      } catch (error) {
+        URL.revokeObjectURL(messagePreviewUrl);
+        set((state) => ({
+          messagesByRoom: {
+            ...state.messagesByRoom,
+            [roomId]: (state.messagesByRoom[roomId] ?? []).filter((message) => message.id !== messageId),
+          },
+          pendingAckIds: state.pendingAckIds.filter((id) => id !== messageId),
+          connectionError:
+            error instanceof Error ? error.message.replaceAll("\n", " ").trim() : "upload_failed",
+        }));
+      }
+      return;
+    }
+
+    get().sendMessage(roomId);
   },
   deleteMessages: (roomId, messageIds) => {
     if (!roomId || messageIds.length === 0) {

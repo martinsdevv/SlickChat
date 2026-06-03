@@ -121,13 +121,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(loginResponse{
+	resp := loginResponse{
 		Token:     result.TokenRaw,
 		UserID:    result.User.ID.String(),
 		Handle:    result.User.Handle(),
 		ExpiresAt: result.Session.ExpiresAt,
-	})
+	}
+	if result.User.AvatarObjectKey != "" {
+		resp.AvatarObjectKey = result.User.AvatarObjectKey
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 // POST /logout
@@ -221,17 +226,22 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(meResponse{
+	resp := meResponse{
 		UserID:    user.ID.String(),
 		Handle:    user.Handle(),
 		CreatedAt: user.CreatedAt,
-	})
+	}
+	if user.AvatarObjectKey != "" {
+		resp.AvatarObjectKey = user.AvatarObjectKey
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
 type meResponse struct {
-	UserID    string    `json:"user_id"`
-	Handle    string    `json:"handle"`
-	CreatedAt time.Time `json:"created_at"`
+	UserID          string    `json:"user_id"`
+	Handle          string    `json:"handle"`
+	AvatarObjectKey string    `json:"avatar_object_key,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type registerResponse struct {
@@ -241,10 +251,11 @@ type registerResponse struct {
 }
 
 type loginResponse struct {
-	Token     string    `json:"token"`
-	UserID    string    `json:"user_id"`
-	Handle    string    `json:"handle"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Token           string    `json:"token"`
+	UserID          string    `json:"user_id"`
+	Handle          string    `json:"handle"`
+	AvatarObjectKey string    `json:"avatar_object_key,omitempty"`
+	ExpiresAt       time.Time `json:"expires_at"`
 }
 
 func extractBearerToken(r *http.Request) string {

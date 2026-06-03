@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/martinsdevv/slickchat/core/application"
 	"github.com/martinsdevv/slickchat/core/domain"
 	"github.com/martinsdevv/slickchat/core/events"
+	"github.com/martinsdevv/slickchat/infrastructure/config"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
 	"github.com/redis/go-redis/v9"
@@ -191,7 +193,20 @@ func fetchMessageContext(ctx context.Context, apiBaseURL string, messageID strin
 func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client *Client, userID string, payload SendMessagePayload) {
 	ctx := context.Background()
 
-	if payload.RoomID == "" || payload.Content == "" {
+	messageType := strings.ToUpper(strings.TrimSpace(payload.MessageType))
+	if messageType == "" {
+		messageType = "TEXT"
+	}
+
+	if payload.RoomID == "" {
+		sendError(client, "invalid_payload")
+		return
+	}
+	if messageType == "TEXT" && strings.TrimSpace(payload.Content) == "" {
+		sendError(client, "invalid_payload")
+		return
+	}
+	if messageType == "IMAGE" && strings.TrimSpace(payload.ObjectKey) == "" {
 		sendError(client, "invalid_payload")
 		return
 	}
@@ -199,7 +214,7 @@ func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client 
 		sendError(client, "invalid_room_id")
 		return
 	}
-	if len(payload.Content) > 2000 {
+	if len(payload.Content) > domain.MaxMessageContentLength {
 		sendError(client, "content_too_long")
 		return
 	}
@@ -209,7 +224,7 @@ func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client 
 		return
 	}
 
-	room, membership, err := fetchRoomContext(ctx, rdb, "http://localhost:8081", payload.RoomID, userID)
+	room, membership, err := fetchRoomContext(ctx, rdb, config.APIInternalURL(), payload.RoomID, userID)
 	if err != nil {
 		if err.Error() == "not_in_room" {
 			sendError(client, "not_in_room")
@@ -221,10 +236,21 @@ func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client 
 	}
 
 	messageID := uuid.New()
+	if id, err := uuid.Parse(strings.TrimSpace(payload.MessageID)); err == nil {
+		messageID = id
+	}
+
+	caption := strings.TrimSpace(payload.Content)
+	attachmentKey := strings.TrimSpace(payload.ObjectKey)
+
 	msgKey := "message:" + messageID.String()
-	if err := rdb.HSet(ctx, msgKey, map[string]interface{}{
+	redisFields := map[string]interface{}{
 		"sender_id": userID,
-	}).Err(); err != nil {
+	}
+	if messageType == "IMAGE" && attachmentKey != "" {
+		redisFields["attachment_object_key"] = attachmentKey
+	}
+	if err := rdb.HSet(ctx, msgKey, redisFields).Err(); err != nil {
 		log.Logger.Error("redis hset message", "error", err)
 		sendError(client, "internal_error")
 		return
@@ -237,7 +263,9 @@ func handleSendMessage(rdb *redis.Client, producer *kafkainfra.Producer, client 
 		membership,
 		uuid.MustParse(userID),
 		messageID,
-		payload.Content,
+		messageType,
+		caption,
+		attachmentKey,
 	); err != nil {
 		_ = rdb.Del(ctx, msgKey).Err()
 		log.Logger.Error("Erro ao enviar mensagem", "error", err)
@@ -363,7 +391,7 @@ func handleMessageRead(
 
 	_ = application.ReadMessage(producer, userID, payload.RoomID, payload.MessageID, senderID)
 
-	mc, err := fetchMessageContext(ctx, "http://localhost:8081", payload.MessageID)
+	mc, err := fetchMessageContext(ctx, config.APIInternalURL(), payload.MessageID)
 	if err != nil {
 		// read já foi publicado; falha de auto-delete não pode derrubar a sessão
 		log.Logger.Error("message context failed", "error", err)
@@ -411,7 +439,7 @@ func handleDeleteMessage(
 		return
 	}
 
-	room, membership, err := fetchRoomContext(ctx, rdb, "http://localhost:8081", payload.RoomID, userID)
+	room, membership, err := fetchRoomContext(ctx, rdb, config.APIInternalURL(), payload.RoomID, userID)
 	if err != nil {
 		if err.Error() == "not_in_room" {
 			sendError(client, "not_in_room")
@@ -422,7 +450,7 @@ func handleDeleteMessage(
 		return
 	}
 
-	mc, err := fetchMessageContext(ctx, "http://localhost:8081", payload.MessageID)
+	mc, err := fetchMessageContext(ctx, config.APIInternalURL(), payload.MessageID)
 	if err != nil {
 		log.Logger.Error("message context failed", "error", err)
 		sendError(client, "delete_failed")

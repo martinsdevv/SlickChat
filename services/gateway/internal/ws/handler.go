@@ -37,8 +37,11 @@ type Message struct {
 }
 
 type SendMessagePayload struct {
-	RoomID  string `json:"room_id"`
-	Content string `json:"content"`
+	RoomID      string `json:"room_id"`
+	Content     string `json:"content"`
+	MessageID   string `json:"message_id,omitempty"`
+	MessageType string `json:"message_type,omitempty"`
+	ObjectKey   string `json:"object_key,omitempty"`
 }
 
 type OutMessage struct {

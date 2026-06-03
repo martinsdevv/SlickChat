@@ -5,26 +5,28 @@ import (
 
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
+	"github.com/martinsdevv/slickchat/infrastructure/config"
+	"github.com/martinsdevv/slickchat/infrastructure/media"
 	"github.com/martinsdevv/slickchat/infrastructure/postgres"
 	"github.com/martinsdevv/slickchat/services/workers/persistence"
 )
 
 func main() {
-	dsn := "postgres://postgres:postgres@localhost:5432/slickchat?sslmode=disable"
-
-	db, err := postgres.NewConnection(dsn)
+	db, err := postgres.NewConnection(config.LoadDBConfig().PGURL())
 	if err != nil {
 		log.Logger.Error("failed to connect to postgres", "error", err)
 		os.Exit(1)
 	}
 
 	repo := postgres.NewMessageRepository(db)
+	attachmentRepo := postgres.NewAttachmentRepository(db)
 
-	handler := persistence.NewHandler(repo)
+	objectStorage := media.NewObjectStorageFromConfig(config.LoadMediaConfig())
+	handler := persistence.NewHandler(repo, attachmentRepo, objectStorage)
 	log.Logger.Info("starting persistence worker")
 
 	kafkainfra.StartConsumer(
-		"localhost:9092",
+		config.KafkaBroker(),
 		"message-events",
 		"persistence-group",
 		handler.Handle,

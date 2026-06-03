@@ -14,6 +14,7 @@ import (
 )
 
 var ErrRoomNotFound = errors.New("room not found")
+var ErrRoomNotPublic = errors.New("only public rooms can be joined by id")
 
 func JoinRoom(
 	ctx context.Context,
@@ -31,6 +32,41 @@ func JoinRoom(
 		return err
 	}
 
+	return addRoomMember(ctx, producer, memberships, roomID, userID, role)
+}
+
+// JoinPublicRoom allows self-join by room ID — only PUBLIC rooms.
+func JoinPublicRoom(
+	ctx context.Context,
+	producer *kafkainfra.Producer,
+	rooms contracts.RoomRepository,
+	memberships contracts.RoomMembershipRepository,
+	roomID uuid.UUID,
+	userID uuid.UUID,
+	role domain.Role,
+) error {
+	room, err := rooms.GetByID(ctx, roomID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrRoomNotFound
+		}
+		return err
+	}
+	if room.Type != domain.RoomTypePublic {
+		return ErrRoomNotPublic
+	}
+
+	return addRoomMember(ctx, producer, memberships, roomID, userID, role)
+}
+
+func addRoomMember(
+	ctx context.Context,
+	producer *kafkainfra.Producer,
+	memberships contracts.RoomMembershipRepository,
+	roomID uuid.UUID,
+	userID uuid.UUID,
+	role domain.Role,
+) error {
 	if _, err := memberships.Get(ctx, roomID, userID); err == nil {
 		// already a member: no-op, preserve existing role
 		return nil

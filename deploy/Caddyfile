@@ -1,0 +1,31 @@
+# Entrada única para demo (frontend + API + WS + MinIO).
+# Requer backend Go na máquina host (8080 gateway, 8081 API, 9000 MinIO).
+
+:3000 {
+	encode gzip
+
+	request_body {
+		max_size 20MB
+	}
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy host.docker.internal:8081
+	}
+
+	handle /ws/* {
+		uri strip_prefix /ws
+		reverse_proxy host.docker.internal:8080
+	}
+
+	handle /storage/* {
+		uri strip_prefix /storage
+		reverse_proxy host.docker.internal:9000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/martinsdevv/slickchat/infrastructure/config"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
 	redisinfra "github.com/martinsdevv/slickchat/infrastructure/redis"
@@ -12,7 +13,7 @@ import (
 
 func main() {
 	rdb := redisinfra.NewClient()
-	producer := kafkainfra.NewProducer("localhost:9092")
+	producer := kafkainfra.NewProducer(config.KafkaBroker())
 	ticketStore := redisinfra.NewWSTicketStore(rdb)
 
 	http.HandleFunc("/socket", ws.HandleWS(rdb, producer, ticketStore))

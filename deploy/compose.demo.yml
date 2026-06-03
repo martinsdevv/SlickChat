@@ -1,0 +1,17 @@
+# Proxy HTTP para demo pública (use com backend Go no host).
+# Infra (Postgres, Redis, Kafka, MinIO): deploy/compose.yml
+
+name: slickchat-demo
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: slickchat-caddy
+    restart: unless-stopped
+    ports:
+      - "${DEMO_PORT:-3000}:3000"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../frontend/web/dist:/srv:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

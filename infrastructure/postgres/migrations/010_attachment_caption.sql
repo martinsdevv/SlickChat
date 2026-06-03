@@ -1,0 +1,2 @@
+ALTER TABLE attachments
+    ADD COLUMN IF NOT EXISTS caption TEXT;

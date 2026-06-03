@@ -3,22 +3,29 @@ package persistence
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/martinsdevv/slickchat/infrastructure/log"
-
+	"github.com/martinsdevv/slickchat/core/application"
 	"github.com/martinsdevv/slickchat/core/contracts"
 	"github.com/martinsdevv/slickchat/core/domain"
 	"github.com/martinsdevv/slickchat/core/events"
+	"github.com/martinsdevv/slickchat/infrastructure/log"
 )
 
 type Handler struct {
-	repo contracts.MessageRepository
+	repo        contracts.MessageRepository
+	attachments contracts.AttachmentRepository
+	storage     contracts.ObjectStorage
 }
 
-func NewHandler(repo contracts.MessageRepository) *Handler {
-	return &Handler{repo: repo}
+func NewHandler(
+	repo contracts.MessageRepository,
+	attachments contracts.AttachmentRepository,
+	storage contracts.ObjectStorage,
+) *Handler {
+	return &Handler{repo: repo, attachments: attachments, storage: storage}
 }
 
 func (h *Handler) Handle(event events.Event) {
@@ -87,11 +94,20 @@ func (h *Handler) handleMessageSent(event events.Event) {
 		expiresAt = &t
 	}
 
+	caption := strings.TrimSpace(payload.Content)
+	attachmentKey := strings.TrimSpace(payload.AttachmentObjectKey)
+	if payload.MessageType == "IMAGE" {
+		if attachmentKey == "" && strings.HasPrefix(caption, "messages/") {
+			attachmentKey = caption
+			caption = ""
+		}
+	}
+
 	msg := &domain.Message{
 		ID:               id,
 		RoomID:           roomID,
 		SenderID:         senderID,
-		Content:          payload.Content,
+		Content:          caption,
 		MessageType:      payload.MessageType,
 		TTL:              payload.TTL,
 		CreatedAt:        payload.SentAt,
@@ -99,14 +115,24 @@ func (h *Handler) handleMessageSent(event events.Event) {
 		DestroyAfterRead: payload.DestroyAfterRead,
 	}
 
-	n, err := h.repo.Save(context.Background(), msg)
-	if err != nil {
+	if _, err := h.repo.Save(context.Background(), msg); err != nil {
 		log.Logger.Error("failed to persist message", "error", err, "message_id", msg.ID)
 		return
 	}
-	if n == 0 {
-		log.Logger.Info("message persist skipped duplicate", "message_id", msg.ID)
-		return
+
+	if payload.MessageType == "IMAGE" && attachmentKey != "" && h.attachments != nil {
+		attachment := &domain.Attachment{
+			ID:        uuid.New(),
+			MessageID: id,
+			RoomID:    roomID,
+			ObjectKey: attachmentKey,
+			Caption:   caption,
+			MediaType: domain.MediaTypeImage,
+			CreatedAt: payload.SentAt,
+		}
+		if err := h.attachments.ReplaceForMessage(context.Background(), attachment); err != nil {
+			log.Logger.Error("failed to persist attachment", "error", err, "message_id", msg.ID)
+		}
 	}
 
 	log.Logger.Info("message persisted", "message_id:", msg.ID)
@@ -133,10 +159,11 @@ func (h *Handler) handleMessageDeleted(event events.Event) {
 	}
 	if n == 0 {
 		log.Logger.Info("message delete noop already gone", "message_id", payload.MessageID)
-		return
+	} else {
+		log.Logger.Info("message deleted", "message_id", payload.MessageID)
 	}
 
-	log.Logger.Info("message deleted", "message_id", payload.MessageID)
+	h.purgeMedia(id)
 }
 
 func (h *Handler) handleMessageExpired(event events.Event) {
@@ -160,8 +187,15 @@ func (h *Handler) handleMessageExpired(event events.Event) {
 	}
 	if n == 0 {
 		log.Logger.Info("message expired noop already gone", "message_id", payload.MessageID)
-		return
+	} else {
+		log.Logger.Info("message expired removed", "message_id", payload.MessageID)
 	}
 
-	log.Logger.Info("message expired removed", "message_id", payload.MessageID)
+	h.purgeMedia(id)
+}
+
+func (h *Handler) purgeMedia(messageID uuid.UUID) {
+	if err := application.PurgeMessageMedia(context.Background(), h.attachments, h.storage, messageID); err != nil {
+		log.Logger.Error("failed to purge message media", "message_id", messageID, "error", err)
+	}
 }

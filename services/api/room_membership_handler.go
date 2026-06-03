@@ -68,10 +68,14 @@ func (h *RoomMembershipWriteHandler) JoinRoom(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	err = application.JoinRoom(r.Context(), h.producer, h.rooms, h.memberships, roomID, userID, domain.RoleMember)
+	err = application.JoinPublicRoom(r.Context(), h.producer, h.rooms, h.memberships, roomID, userID, domain.RoleMember)
 	if err != nil {
 		if errors.Is(err, application.ErrRoomNotFound) {
 			http.Error(w, "room not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, application.ErrRoomNotPublic) {
+			http.Error(w, "only public rooms can be joined by id", http.StatusForbidden)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)

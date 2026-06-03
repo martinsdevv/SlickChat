@@ -12,4 +12,5 @@ type UserRepository interface {
 	GetByHandle(ctx context.Context, username, discriminator string) (*domain.User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	HandleExists(ctx context.Context, username, discriminator string) (bool, error)
+	SetAvatarObjectKey(ctx context.Context, userID uuid.UUID, objectKey string) (previousKey string, err error)
 }

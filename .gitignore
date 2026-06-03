@@ -3,6 +3,10 @@
 plano_desenvolvimento.md
 .cursor/
 
+# Deploy local (não versionar — edite só deploy/.env)
+deploy/.env
+deploy/logs/
+
 # Logs
 logs
 *.log

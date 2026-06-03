@@ -1,13 +1,20 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { apiRequest } from "../../shared/api/http-client";
-import type { CreateRoomRequest, Room, RoomMember } from "../../shared/api/types";
+import { useSessionStore } from "../session/store";
+import type {
+  CreateRoomRequest,
+  Room,
+  RoomMember,
+  RoomUnreadItem,
+} from "../../shared/api/types";
 
 type RoomFilters = "ALL" | "TEMPORARY" | "ZERO_LOGGING";
 
 type RoomsState = {
   rooms: Room[];
   activeRoomId: string | null;
+  unreadByRoom: Record<string, number>;
   membersByRoom: Record<string, RoomMember[]>;
   isLoadingRooms: boolean;
   isCreatingRoom: boolean;
@@ -15,10 +22,17 @@ type RoomsState = {
   setRoomFilter: (value: RoomFilters) => void;
   setActiveRoom: (roomId: string) => void;
   loadRooms: (token: string) => Promise<void>;
+  loadUnreadCounts: (token: string) => Promise<void>;
+  bumpRoomUnread: (roomId: string) => void;
+  clearRoomUnread: (token: string, roomId: string) => Promise<void>;
   createRoom: (token: string, input: CreateRoomRequest) => Promise<Room>;
   joinRoom: (token: string, roomId: string) => Promise<void>;
   addMember: (token: string, roomId: string, handle: string) => Promise<void>;
   loadMembers: (token: string, roomId: string) => Promise<void>;
+  patchRoomMedia: (
+    roomId: string,
+    media: { avatar_object_key?: string; banner_object_key?: string },
+  ) => void;
   reset: () => void;
 };
 
@@ -35,15 +49,53 @@ function sortRoomsByPriority(rooms: Room[]): Room[] {
 
 export const useRoomsStore = create<RoomsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       rooms: [],
       activeRoomId: null,
+      unreadByRoom: {},
       membersByRoom: {},
       isLoadingRooms: false,
       isCreatingRoom: false,
       roomFilter: "ALL",
       setRoomFilter: (value) => set({ roomFilter: value }),
-      setActiveRoom: (roomId) => set({ activeRoomId: roomId }),
+      clearRoomUnread: async (token, roomId) => {
+        set((state) => ({
+          unreadByRoom: { ...state.unreadByRoom, [roomId]: 0 },
+        }));
+        await apiRequest<void>("/rooms/unread/clear", {
+          method: "POST",
+          token,
+          query: { room_id: roomId },
+        });
+      },
+      setActiveRoom: (roomId) => {
+        set({ activeRoomId: roomId });
+        const token = useSessionStore.getState().token;
+        if (token) {
+          void get().clearRoomUnread(token, roomId).catch(() => undefined);
+        } else {
+          set((state) => ({
+            unreadByRoom: { ...state.unreadByRoom, [roomId]: 0 },
+          }));
+        }
+      },
+      loadUnreadCounts: async (token) => {
+        const items = await apiRequest<RoomUnreadItem[]>("/rooms/unread", { token });
+        const unreadByRoom: Record<string, number> = {};
+        for (const item of items) {
+          if (item.count > 0) {
+            unreadByRoom[item.room_id] = item.count;
+          }
+        }
+        set({ unreadByRoom });
+      },
+      bumpRoomUnread: (roomId) =>
+        set((state) => ({
+          unreadByRoom: {
+            ...state.unreadByRoom,
+            [roomId]: (state.unreadByRoom[roomId] ?? 0) + 1,
+          },
+        })),
       loadRooms: async (token) => {
         set({ isLoadingRooms: true });
         try {
@@ -57,6 +109,11 @@ export const useRoomsStore = create<RoomsState>()(
               ? state.activeRoomId
               : sorted[0]?.room_id ?? null,
           }));
+          await get().loadUnreadCounts(token);
+          const activeId = get().activeRoomId;
+          if (activeId) {
+            await get().clearRoomUnread(token, activeId).catch(() => undefined);
+          }
         } finally {
           set({ isLoadingRooms: false });
         }
@@ -110,10 +167,28 @@ export const useRoomsStore = create<RoomsState>()(
           },
         }));
       },
+      patchRoomMedia: (roomId, media) => {
+        set((state) => ({
+          rooms: state.rooms.map((room) =>
+            room.room_id === roomId
+              ? {
+                  ...room,
+                  ...(media.avatar_object_key !== undefined
+                    ? { avatar_object_key: media.avatar_object_key }
+                    : {}),
+                  ...(media.banner_object_key !== undefined
+                    ? { banner_object_key: media.banner_object_key }
+                    : {}),
+                }
+              : room,
+          ),
+        }));
+      },
       reset: () =>
         set({
           rooms: [],
           activeRoomId: null,
+          unreadByRoom: {},
           membersByRoom: {},
           isLoadingRooms: false,
           isCreatingRoom: false,

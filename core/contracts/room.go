@@ -12,13 +12,16 @@ type RoomRepository interface {
 	GetByID(ctx context.Context, roomID uuid.UUID) (*domain.Room, error)
 	ListPublic(ctx context.Context, limit int) ([]*domain.Room, error)
 	ListByUser(ctx context.Context, userID uuid.UUID, limit int) ([]*domain.Room, error)
+	SetAvatarObjectKey(ctx context.Context, roomID uuid.UUID, objectKey string) (previousKey string, err error)
+	SetBannerObjectKey(ctx context.Context, roomID uuid.UUID, objectKey string) (previousKey string, err error)
 }
 
 // MemberInfo is a read model combining membership and user identity.
 type MemberInfo struct {
-	UserID uuid.UUID
-	Handle string
-	Role   domain.Role
+	UserID          uuid.UUID
+	Handle          string
+	Role            domain.Role
+	AvatarObjectKey string
 }
 
 type RoomMembershipRepository interface {

@@ -18,7 +18,7 @@ func SendMessage(
 	content string,
 ) (string, error) {
 	id := uuid.New()
-	if err := SendMessageWithID(producer, room, membership, userID, id, content); err != nil {
+	if err := SendMessageWithID(producer, room, membership, userID, id, "TEXT", content, ""); err != nil {
 		return "", err
 	}
 	return id.String(), nil
@@ -31,8 +31,13 @@ func SendMessageWithID(
 	membership *domain.RoomMembership,
 	userID uuid.UUID,
 	messageID uuid.UUID,
+	messageType string,
 	content string,
+	attachmentObjectKey string,
 ) error {
+	if messageType == "" {
+		messageType = "TEXT"
+	}
 
 	now := time.Now().UTC()
 
@@ -47,12 +52,13 @@ func SendMessageWithID(
 	}
 
 	payload := events.MessageSent{
-		MessageID:        messageID.String(),
-		RoomID:           room.ID.String(),
-		SenderID:         userID.String(),
-		Content:          content,
-		MessageType:      "TEXT",
-		IsZeroLogging:    !room.CanPersistMessages(),
+		MessageID:           messageID.String(),
+		RoomID:              room.ID.String(),
+		SenderID:            userID.String(),
+		Content:             content,
+		MessageType:         messageType,
+		AttachmentObjectKey: attachmentObjectKey,
+		IsZeroLogging:       !room.CanPersistMessages(),
 		TTL:              room.TTL,
 		DestroyAfterRead: false,
 		ExpiresAt:        expiresAt,

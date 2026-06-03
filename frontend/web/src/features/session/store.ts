@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { apiRequest } from "../../shared/api/http-client";
 import { useRoomsStore } from "../rooms/store";
+import { ApiError } from "../../shared/api/types";
 import type {
   LoginRequest,
   LoginResponse,
@@ -15,6 +16,7 @@ export type SessionUser = {
   handle: string;
   username: string;
   discriminator: string;
+  avatarObjectKey?: string;
 };
 
 type RegisterResult = {
@@ -31,6 +33,8 @@ type SessionState = {
   register: (input: RegisterRequest) => Promise<RegisterResult>;
   login: (input: LoginRequest) => Promise<void>;
   bootstrap: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  patchUserAvatar: (objectKey: string) => void;
   logout: () => Promise<void>;
 };
 
@@ -47,6 +51,7 @@ function mapMeToUser(me: MeResponse): SessionUser {
     handle: me.handle,
     username,
     discriminator,
+    avatarObjectKey: me.avatar_object_key,
   };
 }
 
@@ -86,9 +91,32 @@ export const useSessionStore = create<SessionState>()(
             handle: response.handle,
             username,
             discriminator,
+            avatarObjectKey: response.avatar_object_key,
           },
           isAuthenticated: true,
         });
+        await get().refreshProfile();
+      },
+      patchUserAvatar: (objectKey) => {
+        set((state) => ({
+          user: state.user ? { ...state.user, avatarObjectKey: objectKey } : state.user,
+        }));
+      },
+      refreshProfile: async () => {
+        const token = get().token;
+        if (!token) {
+          return;
+        }
+
+        try {
+          const me = await apiRequest<MeResponse>("/users/me", { token });
+          set({
+            user: mapMeToUser(me),
+            isAuthenticated: true,
+          });
+        } catch {
+          // Mantém sessão; falha só impede atualizar metadados do perfil.
+        }
       },
       bootstrap: async () => {
         const token = get().token;
@@ -108,13 +136,17 @@ export const useSessionStore = create<SessionState>()(
             user: mapMeToUser(me),
             isAuthenticated: true,
           });
-        } catch {
-          set({
-            token: null,
-            expiresAt: null,
-            user: null,
-            isAuthenticated: false,
-          });
+        } catch (error) {
+          const unauthorized =
+            error instanceof ApiError && (error.status === 401 || error.status === 403);
+          if (unauthorized) {
+            set({
+              token: null,
+              expiresAt: null,
+              user: null,
+              isAuthenticated: false,
+            });
+          }
         } finally {
           set({ isBootstrapping: false });
         }

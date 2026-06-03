@@ -64,7 +64,7 @@ func TestHandler_handleMessageSent_idempotenciaSaveZero(t *testing.T) {
 	roomID := uuid.New()
 	sender := uuid.New()
 	repo := &stubMessageRepo{saveN: []int64{1, 0}}
-	h := NewHandler(repo)
+	h := NewHandler(repo, nil, nil)
 
 	payload := events.MessageSent{
 		MessageID:     id.String(),
@@ -89,7 +89,7 @@ func TestHandler_handleMessageSent_idempotenciaSaveZero(t *testing.T) {
 
 func TestHandler_handleMessageSent_zeroLoggingNaoPersiste(t *testing.T) {
 	repo := &stubMessageRepo{saveN: []int64{1}}
-	h := NewHandler(repo)
+	h := NewHandler(repo, nil, nil)
 	id := uuid.New()
 	roomID := uuid.New()
 	sender := uuid.New()
@@ -114,7 +114,7 @@ func TestHandler_handleMessageDeleted_deleteIdempotenteZeroLinhas(t *testing.T) 
 	id := uuid.New()
 	roomID := uuid.New()
 	repo := &stubMessageRepo{delN: []int64{0}}
-	h := NewHandler(repo)
+	h := NewHandler(repo, nil, nil)
 
 	payload := events.MessageDeleted{
 		MessageID: id.String(),

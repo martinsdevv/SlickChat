@@ -16,16 +16,18 @@ const (
 )
 
 type Room struct {
-	ID           uuid.UUID
-	Name         string
-	Description  string
-	Type         RoomType
-	OwnerID      uuid.UUID
-	TTL          int
-	ParanoidMode bool
-	ZeroLogging  bool
-	CreatedAt    time.Time
-	ExpiresAt    *time.Time
+	ID              uuid.UUID
+	Name            string
+	Description     string
+	Type            RoomType
+	OwnerID         uuid.UUID
+	TTL             int
+	ParanoidMode    bool
+	ZeroLogging     bool
+	AvatarObjectKey string
+	BannerObjectKey string
+	CreatedAt       time.Time
+	ExpiresAt       *time.Time
 }
 
 type RoomMembership struct {
@@ -48,6 +50,11 @@ func (r *Room) CanPersistMessages() bool {
 		return false
 	}
 	return true
+}
+
+// CanPersistAttachments follows message persistence: ephemeral rooms must not keep files after destroy.
+func (r *Room) CanPersistAttachments() bool {
+	return r.CanPersistMessages()
 }
 func (r *Room) CanUserSendMessage(userID uuid.UUID, role Role, now time.Time) error {
 	if r.IsExpired(now) {

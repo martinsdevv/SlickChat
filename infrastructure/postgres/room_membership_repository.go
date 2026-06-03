@@ -79,7 +79,7 @@ func (r *RoomMembershipRepository) Remove(ctx context.Context, roomID uuid.UUID,
 
 func (r *RoomMembershipRepository) ListByRoom(ctx context.Context, roomID uuid.UUID) ([]contracts.MemberInfo, error) {
 	query := `
-		SELECT rm.user_id, u.username, u.discriminator,
+		SELECT rm.user_id, u.username, u.discriminator, u.avatar_object_key,
 		       CASE
 		         WHEN ro.owner_id = rm.user_id THEN 'ADMIN'
 		         ELSE rm.role
@@ -103,18 +103,23 @@ func (r *RoomMembershipRepository) ListByRoom(ctx context.Context, roomID uuid.U
 			userID        uuid.UUID
 			username      string
 			discriminator string
+			avatarKey     sql.NullString
 			role          string
 		)
 
-		if err := rows.Scan(&userID, &username, &discriminator, &role); err != nil {
+		if err := rows.Scan(&userID, &username, &discriminator, &avatarKey, &role); err != nil {
 			return nil, err
 		}
 
-		members = append(members, contracts.MemberInfo{
+		info := contracts.MemberInfo{
 			UserID: userID,
 			Handle: username + "#" + discriminator,
 			Role:   domain.Role(role),
-		})
+		}
+		if avatarKey.Valid {
+			info.AvatarObjectKey = avatarKey.String
+		}
+		members = append(members, info)
 	}
 
 	return members, rows.Err()

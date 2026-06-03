@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +15,7 @@ import (
 type MessageHandler struct {
 	repo        contracts.MessageRepository
 	memberships contracts.RoomMembershipRepository
+	attachments contracts.AttachmentRepository
 }
 
 type RoomContextHandler struct {
@@ -24,10 +27,15 @@ type MessageContextHandler struct {
 	repo contracts.MessageRepository
 }
 
-func NewMessageHandler(repo contracts.MessageRepository, memberships contracts.RoomMembershipRepository) *MessageHandler {
+func NewMessageHandler(
+	repo contracts.MessageRepository,
+	memberships contracts.RoomMembershipRepository,
+	attachments contracts.AttachmentRepository,
+) *MessageHandler {
 	return &MessageHandler{
 		repo:        repo,
 		memberships: memberships,
+		attachments: attachments,
 	}
 }
 
@@ -76,15 +84,15 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	response := make([]MessageResponse, 0, len(messages))
 
 	for _, msg := range messages {
-		response = append(response, toResponse(msg))
+		response = append(response, h.toMessageResponse(r.Context(), msg))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
-func toResponse(msg *domain.Message) MessageResponse {
-	return MessageResponse{
+func (h *MessageHandler) toMessageResponse(ctx context.Context, msg *domain.Message) MessageResponse {
+	resp := MessageResponse{
 		ID:        msg.ID.String(),
 		SenderID:  msg.SenderID.String(),
 		Content:   msg.Content,
@@ -92,6 +100,33 @@ func toResponse(msg *domain.Message) MessageResponse {
 		CreatedAt: msg.CreatedAt,
 		ExpiresAt: msg.ExpiresAt,
 	}
+
+	if msg.MessageType != "IMAGE" || h.attachments == nil {
+		return resp
+	}
+
+	attachments, err := h.attachments.ListByMessageID(ctx, msg.ID)
+	if err == nil && len(attachments) > 0 {
+		resp.AttachmentObjectKey = attachments[0].ObjectKey
+		for _, att := range attachments {
+			if att.Caption != "" {
+				resp.Caption = att.Caption
+				break
+			}
+		}
+	}
+
+	if resp.AttachmentObjectKey == "" && strings.HasPrefix(msg.Content, "messages/") {
+		resp.AttachmentObjectKey = msg.Content
+	}
+
+	if resp.Caption == "" && msg.Content != "" && !strings.HasPrefix(msg.Content, "messages/") {
+		resp.Caption = msg.Content
+	}
+
+	resp.Content = resp.Caption
+
+	return resp
 }
 
 type RoomContextResponse struct {

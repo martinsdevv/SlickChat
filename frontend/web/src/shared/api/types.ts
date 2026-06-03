@@ -36,13 +36,20 @@ export type LoginResponse = {
   token: string;
   user_id: string;
   handle: string;
+  avatar_object_key?: string;
   expires_at: string;
 };
 
 export type MeResponse = {
   user_id: string;
   handle: string;
+  avatar_object_key?: string;
   created_at: string;
+};
+
+export type RoomUnreadItem = {
+  room_id: string;
+  count: number;
 };
 
 export type Room = {
@@ -54,6 +61,8 @@ export type Room = {
   ttl: number;
   paranoid_mode: boolean;
   zero_logging: boolean;
+  avatar_object_key?: string;
+  banner_object_key?: string;
   created_at: string;
   expires_at?: string;
 };
@@ -70,6 +79,22 @@ export type RoomMember = {
   user_id: string;
   handle: string;
   role: "ADMIN" | "MODERATOR" | "MEMBER";
+  avatar_object_key?: string;
+};
+
+export type RoomMediaPurpose = "room_avatar" | "room_banner" | "message_image" | "user_avatar";
+
+export type MediaUploadRequestResponse = {
+  upload_id: string;
+  object_key: string;
+  upload_url: string;
+  upload_via_api?: boolean;
+  expires_in_seconds: number;
+};
+
+export type MediaUploadCompleteResponse = {
+  object_key: string;
+  read_url?: string;
 };
 
 export type WSTicketResponse = {
@@ -80,7 +105,9 @@ export type MessageHistoryItem = {
   id: string;
   sender_id?: string;
   content: string;
+  caption?: string;
   type: string;
+  attachment_object_key?: string;
   created_at: string;
   expires_at?: string | null;
 };
@@ -99,6 +126,9 @@ export type WsInboundPayload = {
   send_message: {
     room_id: string;
     content: string;
+    message_id?: string;
+    message_type?: string;
+    object_key?: string;
   };
   delete_message: {
     room_id: string;

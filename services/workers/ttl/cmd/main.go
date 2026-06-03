@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/martinsdevv/slickchat/infrastructure/config"
 	kafkainfra "github.com/martinsdevv/slickchat/infrastructure/kafka"
 	"github.com/martinsdevv/slickchat/infrastructure/log"
 	"github.com/martinsdevv/slickchat/infrastructure/postgres"
@@ -14,16 +15,14 @@ import (
 )
 
 func main() {
-	dsn := "postgres://postgres:postgres@localhost:5432/slickchat?sslmode=disable"
-
-	db, err := postgres.NewConnection(dsn)
+	db, err := postgres.NewConnection(config.LoadDBConfig().PGURL())
 	if err != nil {
 		log.Logger.Error("failed to connect to postgres", "error", err)
 		os.Exit(1)
 	}
 
 	repo := postgres.NewMessageRepository(db)
-	producer := kafkainfra.NewProducer("localhost:9092")
+	producer := kafkainfra.NewProducer(config.KafkaBroker())
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

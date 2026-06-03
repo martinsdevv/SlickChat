@@ -1,8 +1,36 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { useChatStore, type ChatMessage } from "../../../features/chat/store";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useChatStore,
+  type ChatMessage,
+  type ConnectionStatus,
+} from "../../../features/chat/store";
 import { filterRooms, useRoomsStore } from "../../../features/rooms/store";
 import { useSessionStore } from "../../../features/session/store";
 import { useUIStore } from "../../../features/ui/store";
+import { ApiError } from "../../../shared/api/types";
+import {
+  formatDateTime,
+  formatRoomType,
+  formatRole,
+  MetaRow,
+  ParticipantRow,
+  RoomAvatar,
+  RoomTypeBadge,
+  UserSessionBar,
+} from "./room-ui";
+import { MAX_MESSAGE_CONTENT_LENGTH } from "../../../shared/constants/messages";
+import { cn } from "../../../shared/lib/cn";
+import { MessageImageContent } from "./message-image-content";
+import { MessageText } from "./message-text";
+import { RoomMediaEditor } from "./room-media-editor";
+
+const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
+  idle: "Preparando",
+  connecting: "Conectando…",
+  connected: "Conectado",
+  reconnecting: "Reconectando…",
+  offline: "Offline",
+};
 
 function formatCountdown(seconds: number) {
   if (seconds <= 0) {
@@ -53,6 +81,8 @@ function getTemporaryVisualState(message: ChatMessage, nowMs: number) {
 }
 
 export function ChatShell() {
+  const profileAvatarInputId = useId();
+  const messageFileInputId = useId();
   const { user, token, logout } = useSessionStore();
   const {
     rooms,
@@ -63,12 +93,13 @@ export function ChatShell() {
     isCreatingRoom,
     setRoomFilter,
     setActiveRoom,
+    unreadByRoom,
     loadRooms,
     createRoom,
     joinRoom,
     addMember,
     loadMembers,
-    reset,
+    patchRoomMedia,
   } = useRoomsStore();
   const {
     messagesByRoom,
@@ -80,7 +111,10 @@ export function ChatShell() {
     connect,
     disconnect,
     loadRoomHistory,
-    sendMessage,
+    sendComposer,
+    setPendingAttachment,
+    clearPendingAttachment,
+    pendingAttachmentByRoom,
     deleteMessages,
     markMessageRead,
   } = useChatStore();
@@ -102,6 +136,10 @@ export function ChatShell() {
   const [createRoomFeedback, setCreateRoomFeedback] = useState<string | null>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
+  const [joinRoomIdInput, setJoinRoomIdInput] = useState("");
+  const [isJoiningRoom, setIsJoiningRoom] = useState(false);
+  const [joinRoomFeedback, setJoinRoomFeedback] = useState<string | null>(null);
+  const [roomIdCopyFeedback, setRoomIdCopyFeedback] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const activeRoom = rooms.find((room) => room.room_id === activeRoomId) ?? null;
@@ -150,6 +188,12 @@ export function ChatShell() {
   const orderedRooms = useMemo(() => {
     const roomOrder = new Map(filteredRooms.map((room, index) => [room.room_id, index]));
     return [...filteredRooms].sort((a, b) => {
+      const aUnread = unreadByRoom[a.room_id] ?? 0;
+      const bUnread = unreadByRoom[b.room_id] ?? 0;
+      if (aUnread !== bUnread) {
+        return bUnread - aUnread;
+      }
+
       const aLast = lastMessageByRoom[a.room_id];
       const bLast = lastMessageByRoom[b.room_id];
       const aTime = aLast ? Date.parse(aLast.createdAt) : Number.NEGATIVE_INFINITY;
@@ -161,13 +205,23 @@ export function ChatShell() {
 
       return (roomOrder.get(a.room_id) ?? 0) - (roomOrder.get(b.room_id) ?? 0);
     });
-  }, [filteredRooms, lastMessageByRoom]);
+  }, [filteredRooms, lastMessageByRoom, unreadByRoom]);
   const myMembership = useMemo(
-    () => roomMembers.find((member) => member.user_id === user.userId) ?? null,
-    [roomMembers, user.userId],
+    () => roomMembers.find((member) => member.user_id === user?.userId) ?? null,
+    [roomMembers, user?.userId],
   );
   const canAddMembers = myMembership?.role === "ADMIN";
   const canDeleteAnyMessage = myMembership?.role === "ADMIN";
+  const activeRoomExpiresInSeconds = useMemo(() => {
+    if (!activeRoom?.expires_at) {
+      return null;
+    }
+    return Math.max(Math.ceil((new Date(activeRoom.expires_at).getTime() - clock) / 1000), 0);
+  }, [activeRoom?.expires_at, clock]);
+
+  function handleLogout() {
+    void logout().then(() => disconnect());
+  }
 
   useEffect(() => {
     if (!token) {
@@ -292,6 +346,70 @@ export function ChatShell() {
     setActiveRoom(created.room_id);
   }
 
+  async function handleJoinRoomById() {
+    if (!token) {
+      return;
+    }
+
+    const roomId = joinRoomIdInput.trim();
+    if (!roomId) {
+      setJoinRoomFeedback("Cole o ID da sala.");
+      return;
+    }
+
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(roomId)) {
+      setJoinRoomFeedback("ID inválido. Use o formato UUID da sala.");
+      return;
+    }
+
+    setIsJoiningRoom(true);
+    setJoinRoomFeedback(null);
+    try {
+      await joinRoom(token, roomId);
+      await loadRooms(token);
+      setActiveRoom(roomId);
+      setJoinRoomIdInput("");
+      setJoinRoomFeedback("Você entrou na sala.");
+      setMobileView("chat");
+      window.setTimeout(() => setJoinRoomFeedback(null), 3000);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.status === 404) {
+          setJoinRoomFeedback("Sala não encontrada. Confira o ID.");
+          return;
+        }
+        if (error.status === 403) {
+          setJoinRoomFeedback("Só é possível entrar com ID em salas públicas.");
+          return;
+        }
+      }
+      setJoinRoomFeedback(
+        error instanceof Error
+          ? error.message.replaceAll("\n", " ").trim()
+          : "Não foi possível entrar na sala.",
+      );
+    } finally {
+      setIsJoiningRoom(false);
+    }
+  }
+
+  async function handleCopyRoomId() {
+    if (!activeRoom || activeRoom.type !== "PUBLIC") {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(activeRoom.room_id);
+      setRoomIdCopyFeedback("ID copiado!");
+    } catch {
+      setRoomIdCopyFeedback("Não foi possível copiar.");
+    } finally {
+      window.setTimeout(() => setRoomIdCopyFeedback(null), 2000);
+    }
+  }
+
   async function handleAddMember() {
     if (!token || !activeRoom || !canAddMembers) {
       return;
@@ -350,7 +468,9 @@ export function ChatShell() {
     if (!isRightPanelOpen) {
       toggleRightPanel();
     }
-    setMobileView("info");
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setMobileView("info");
+    }
   }
 
   function closeRoomInfoPanel() {
@@ -366,10 +486,19 @@ export function ChatShell() {
     return null;
   }
 
+  const showDesktopRightColumn = isRightPanelOpen;
+
   return (
-    <div className="grid h-dvh grid-cols-1 overflow-hidden bg-[#07080d] lg:grid-cols-[320px_1fr_340px]">
+    <div
+      className={cn(
+        "grid h-dvh min-w-0 grid-cols-1 overflow-hidden bg-[#07080d]",
+        showDesktopRightColumn
+          ? "lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)_minmax(0,380px)]"
+          : "lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]",
+      )}
+    >
       <aside
-        className={`min-h-0 border-r border-white/8 bg-[#0d0e12] px-4 py-4 ${
+        className={`min-h-0 min-w-0 border-r border-white/8 bg-[#0d0e12] px-4 py-4 ${
           mobileView === "rooms" ? "block" : "hidden lg:block"
         }`}
       >
@@ -377,17 +506,57 @@ export function ChatShell() {
         <h1 className="text-3xl font-semibold tracking-wide text-[var(--text-0)]">
           SlickChat
         </h1>
-        <div className="mt-4 grid gap-2">
+        <div className="mt-3">
+          <UserSessionBar
+            handle={user.handle}
+            userId={user.userId}
+            avatarInputId={profileAvatarInputId}
+            onLogout={handleLogout}
+          />
+        </div>
+        <p className="mt-4 text-sm font-medium text-[var(--text-2)]">Suas salas</p>
+        <div className="mt-3 grid gap-2">
           <button
             disabled={isCreatingRoom || isCreateFormOpen}
             onClick={() => {
               resetCreateRoomForm();
               setIsCreateFormOpen(true);
             }}
-            className="w-full rounded-xl bg-gradient-to-r from-[#7a00ff] to-[#8d2cff] px-4 py-2.5 text-left text-base font-medium text-white disabled:opacity-60"
+            className="w-full rounded-xl bg-gradient-to-r from-[var(--primary-500)] to-[var(--primary-400)] px-4 py-2.5 text-left text-base font-medium text-white transition hover:brightness-110 disabled:opacity-60"
           >
-            Criar Sala
+            Criar sala
           </button>
+        </div>
+        <div className="mt-2 space-y-1.5">
+          <label className="text-xs text-[var(--text-3)]" htmlFor="join-room-id">
+            Entrar com ID da sala
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="join-room-id"
+              value={joinRoomIdInput}
+              onChange={(event) => setJoinRoomIdInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleJoinRoomById();
+                }
+              }}
+              placeholder="UUID da sala pública"
+              className="min-w-0 flex-1 rounded-lg border border-white/15 bg-[var(--bg-1)] px-2.5 py-2 text-xs text-[var(--text-0)] outline-none focus:border-[var(--primary-400)]"
+            />
+            <button
+              type="button"
+              disabled={isJoiningRoom || !joinRoomIdInput.trim()}
+              onClick={() => void handleJoinRoomById()}
+              className="shrink-0 rounded-lg border border-white/15 px-2.5 py-2 text-xs text-[var(--text-1)] transition hover:bg-white/10 disabled:opacity-50"
+            >
+              {isJoiningRoom ? "…" : "Entrar"}
+            </button>
+          </div>
+          {joinRoomFeedback ? (
+            <p className="text-xs text-[var(--text-2)]">{joinRoomFeedback}</p>
+          ) : null}
         </div>
         {isCreateFormOpen ? (
           <div className="mt-3 space-y-2 rounded-xl border border-white/10 bg-[#14151a] p-3">
@@ -485,8 +654,14 @@ export function ChatShell() {
               Carregando salas...
             </p>
           ) : null}
+          {!isLoadingRooms && orderedRooms.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-white/10 px-3 py-4 text-center text-sm text-[var(--text-3)]">
+              Nenhuma sala ainda. Crie uma ou entre com o ID.
+            </p>
+          ) : null}
           {orderedRooms.map((room) => {
             const isActive = room.room_id === activeRoomId;
+            const unreadCount = unreadByRoom[room.room_id] ?? 0;
             return (
               <button
                 key={room.room_id}
@@ -495,35 +670,38 @@ export function ChatShell() {
                   setActiveRoom(room.room_id);
                   setMobileView("chat");
                 }}
-                className={`w-full rounded-xl border px-3 py-2 text-left transition ${
+                className={`w-full rounded-xl border p-2.5 text-left transition ${
                   isActive
                     ? "border-white/10 bg-[#212227]"
                     : "border-transparent bg-transparent hover:bg-[#14151a]"
                 }`}
               >
-                <p className="text-base font-medium text-[var(--text-1)]">{room.name}</p>
-                <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-wide">
-                  <span
-                    className={`rounded px-1.5 py-0.5 ${
-                      room.type === "PRIVATE"
-                        ? "bg-fuchsia-500/20 text-fuchsia-300"
-                        : room.type === "PUBLIC"
-                          ? "bg-emerald-500/20 text-emerald-300"
-                          : "bg-amber-500/20 text-amber-300"
-                    }`}
-                  >
-                    {room.type}
-                  </span>
-                  {room.zero_logging ? (
-                    <span className="rounded bg-[#7a00ff]/20 px-1.5 py-0.5 text-[#d3b3ff]">ZERO</span>
+                <div className="flex gap-3">
+                  <RoomAvatar
+                    name={room.name}
+                    roomId={room.room_id}
+                    objectKey={room.avatar_object_key}
+                    token={token}
+                    size="md"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-medium text-[var(--text-1)]">{room.name}</p>
+                    <RoomTypeBadge type={room.type} zeroLogging={room.zero_logging} compact />
+                    <p className="mt-1 truncate text-sm text-[var(--text-3)] [overflow-wrap:anywhere]">
+                      {lastMessageByRoom[room.room_id]?.content
+                        ? lastMessageByRoom[room.room_id]!.content.slice(0, 120)
+                        : room.description?.trim() || "Abra para conversar"}
+                    </p>
+                  </div>
+                  {!isActive && unreadCount > 0 ? (
+                    <span
+                      className="flex h-6 min-w-6 shrink-0 items-center justify-center self-center rounded-full bg-[var(--primary-500)] px-1.5 text-xs font-semibold text-white"
+                      aria-label={`${unreadCount} mensagens não lidas`}
+                    >
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
                   ) : null}
                 </div>
-                <p className="mt-1 truncate text-sm text-[var(--text-3)]">
-                  {lastMessageByRoom[room.room_id]?.content ?? "Sem mensagens ainda"}
-                </p>
-                {room.description ? (
-                  <p className="mt-1 line-clamp-2 text-xs text-[var(--text-3)]">{room.description}</p>
-                ) : null}
               </button>
             );
           })}
@@ -532,7 +710,7 @@ export function ChatShell() {
       </aside>
 
       <main
-        className={`flex min-h-0 flex-col bg-[#07080d] ${
+        className={`flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#07080d] ${
           mobileView === "chat" ? "flex" : "hidden lg:flex"
         }`}
       >
@@ -550,31 +728,33 @@ export function ChatShell() {
             </button>
             <button
               type="button"
-              className="min-w-0 text-left"
+              className="flex min-w-0 items-center gap-3 text-left"
               onClick={openRoomInfoPanel}
               disabled={!activeRoom}
             >
-              <h1 className="truncate text-2xl font-semibold text-[var(--text-1)]">
-                {activeRoom?.name ?? "Selecione uma sala"}
-              </h1>
               {activeRoom ? (
-                <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-wide">
-                  <span
-                    className={`rounded px-1.5 py-0.5 ${
-                      activeRoom.type === "PRIVATE"
-                        ? "bg-fuchsia-500/20 text-fuchsia-300"
-                        : activeRoom.type === "PUBLIC"
-                          ? "bg-emerald-500/20 text-emerald-300"
-                          : "bg-amber-500/20 text-amber-300"
-                    }`}
-                  >
-                    {activeRoom.type}
-                  </span>
-                  {activeRoom.zero_logging ? (
-                    <span className="rounded bg-[#7a00ff]/20 px-1.5 py-0.5 text-[#d3b3ff]">ZERO</span>
-                  ) : null}
-                </div>
-              ) : null}
+                <RoomAvatar
+                  name={activeRoom.name}
+                  roomId={activeRoom.room_id}
+                  objectKey={activeRoom.avatar_object_key}
+                  token={token}
+                  size="md"
+                />
+              ) : (
+                <div className="h-11 w-11 shrink-0 rounded-2xl border border-dashed border-white/15 bg-[var(--bg-1)]" />
+              )}
+              <div className="min-w-0">
+                <h1 className="truncate text-2xl font-semibold text-[var(--text-1)]">
+                  {activeRoom?.name ?? "Selecione uma sala"}
+                </h1>
+                {activeRoom ? (
+                  <RoomTypeBadge
+                    type={activeRoom.type}
+                    zeroLogging={activeRoom.zero_logging}
+                    compact
+                  />
+                ) : null}
+              </div>
             </button>
           </div>
           <div className="flex items-center gap-2">
@@ -585,18 +765,18 @@ export function ChatShell() {
                   : "bg-[var(--warning-500)]/15 text-[var(--warning-500)]"
               }`}
             >
-              {connectionStatus}
+              {CONNECTION_LABELS[connectionStatus]}
             </span>
             {activeRoom ? (
               <button
                 type="button"
-                className="rounded-md border border-white/20 px-2 py-1 text-xs text-[var(--text-2)]"
+                className="hidden rounded-md border border-white/20 px-2 py-1 text-xs text-[var(--text-2)] sm:inline-flex"
                 onClick={() => {
                   setIsSelectionMode((current) => !current);
                   setSelectedMessageIds([]);
                 }}
               >
-                {isSelectionMode ? "Cancelar seleção" : "Selecionar"}
+                {isSelectionMode ? "Cancelar" : "Selecionar"}
               </button>
             ) : null}
             <button
@@ -614,8 +794,8 @@ export function ChatShell() {
         </header>
 
         {activeRoom?.zero_logging ? (
-          <div className="border-b border-[#674b00] bg-[#2f2300]/45 py-1 text-center text-xs text-[#f7bf31]">
-            Aviso: nada do que voce diz aqui é salvo
+          <div className="border-b border-[var(--warning-500)]/30 bg-[var(--warning-500)]/10 py-2 text-center text-xs text-[var(--warning-500)]">
+            Modo zero logging — nada do que você diz aqui é salvo no servidor
           </div>
         ) : null}
         {isSelectionMode ? (
@@ -632,7 +812,7 @@ export function ChatShell() {
           </div>
         ) : null}
 
-        <section className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-4 py-5">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto px-4 py-5">
           {visibleRoomMessages.map((message) => {
             const visual = getTemporaryVisualState(message, clock);
             const presence = presenceByUserId[message.authorId] ?? "offline";
@@ -644,10 +824,10 @@ export function ChatShell() {
             return (
               <article
                 key={message.id}
-                className={`min-w-0 w-fit max-w-[78%] sm:max-w-[70%] lg:max-w-[62%] rounded-2xl border px-4 py-3 shadow-sm ${
+                className={`min-w-0 max-w-[min(100%,42rem)] shrink-0 rounded-2xl border px-4 py-3 shadow-sm sm:max-w-[min(100%,36rem)] lg:max-w-[min(100%,32rem)] ${
                   message.isOwn
-                    ? "ml-auto border-[#6f00ff]/50 bg-gradient-to-br from-[#7a00ff] to-[#9400ff] text-white"
-                    : "border-white/10 bg-[#1a1b20] text-[var(--text-1)]"
+                    ? "self-end border-[#6f00ff]/50 bg-gradient-to-br from-[#7a00ff] to-[#9400ff] text-white"
+                    : "self-start border-white/10 bg-[#1a1b20] text-[var(--text-1)]"
                 } ${visual.className} ${
                   isSelectionMode && isSelected ? "ring-2 ring-red-400/70" : ""
                 }`}
@@ -671,18 +851,36 @@ export function ChatShell() {
                   ) : null}
                   <span className="opacity-80">{displayHandle}</span>
                   <span
-                    className={`ml-auto ${
+                    className={`ml-auto h-2 w-2 shrink-0 rounded-full ${
                       presence === "online"
-                        ? "text-[var(--success-500)]"
+                        ? "bg-[var(--success-500)]"
                         : presence === "offline"
-                          ? "text-[var(--text-3)]"
-                          : "text-[var(--warning-500)]"
+                          ? "bg-[var(--text-3)]"
+                          : "bg-[var(--warning-500)]"
                     }`}
-                  >
-                    {presence}
-                  </span>
+                    title={
+                      presence === "online"
+                        ? "Online"
+                        : presence === "offline"
+                          ? "Offline"
+                          : "Desconhecido"
+                    }
+                    aria-hidden
+                  />
                 </div>
-                <p className="whitespace-pre-wrap break-all text-base leading-relaxed">{message.content}</p>
+                {message.messageType === "IMAGE" && (message.imageObjectKey || message.imagePreviewUrl) ? (
+                  <div className="space-y-2">
+                    <MessageImageContent
+                      objectKey={message.imageObjectKey ?? ""}
+                      token={token}
+                      previewUrl={message.imagePreviewUrl}
+                      caption={message.content}
+                    />
+                    {message.content.trim() ? <MessageText content={message.content} /> : null}
+                  </div>
+                ) : (
+                  <MessageText content={message.content} />
+                )}
                 <div className="mt-2 border-t border-white/15 pt-2 text-xs opacity-80">
                   <span>{new Date(message.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
                   <span className="ml-2">
@@ -704,64 +902,116 @@ export function ChatShell() {
             );
           })}
           {visibleRoomMessages.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-white/10 bg-[#0e0f13] px-3 py-2 text-sm text-[var(--text-3)]">
-              Sem mensagens ainda nesta sala.
-            </p>
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-[var(--bg-1)] text-[var(--text-3)]">
+                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                </svg>
+              </div>
+              <p className="text-base font-medium text-[var(--text-1)]">Comece a conversa</p>
+              <p className="max-w-sm text-sm text-[var(--text-3)]">
+                {activeRoom?.zero_logging
+                  ? "Mensagens aparecem ao vivo e não ficam no histórico."
+                  : activeRoom?.type === "TEMPORARY"
+                    ? "Mensagens desta sala expiram após o TTL configurado."
+                    : "Envie a primeira mensagem — ela chega em tempo real."}
+              </p>
+            </div>
           ) : null}
           <div ref={messagesEndRef} aria-hidden />
         </section>
 
         <footer className="border-t border-white/10 px-4 py-3">
-          <label className="mb-2 block text-xs text-[var(--text-3)]">
-            {activeRoom?.zero_logging
-              ? "Enviar mensagem (não será salva)"
-              : "Enviar mensagem"}
-          </label>
           {connectionError ? (
-            <p className="mb-2 text-xs text-[var(--warning-500)]">{connectionError}</p>
+            <p className="mb-2 text-xs text-[var(--warning-500)]">
+              {connectionError === "content_too_long"
+                ? `Mensagem muito longa (máx. ${MAX_MESSAGE_CONTENT_LENGTH} caracteres).`
+                : connectionError}
+            </p>
+          ) : null}
+          {activeRoomId && pendingAttachmentByRoom[activeRoomId] ? (
+            <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/10 bg-[var(--bg-1)] p-2">
+              <img
+                src={pendingAttachmentByRoom[activeRoomId]?.previewUrl}
+                alt=""
+                className="h-14 w-14 shrink-0 rounded-lg object-cover"
+              />
+              <p className="min-w-0 flex-1 truncate text-xs text-[var(--text-2)]">
+                {pendingAttachmentByRoom[activeRoomId]?.file.name}
+              </p>
+              <button
+                type="button"
+                onClick={() => clearPendingAttachment(activeRoomId)}
+                className="shrink-0 rounded-lg px-2 py-1 text-xs text-[var(--text-3)] transition hover:bg-white/10 hover:text-[var(--text-0)]"
+                aria-label="Remover anexo"
+              >
+                ✕
+              </button>
+            </div>
           ) : null}
           <div className="flex items-center gap-2">
+            <input
+              id={messageFileInputId}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="sr-only"
+              disabled={!activeRoomId || connectionStatus !== "connected"}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file && activeRoomId) {
+                  setPendingAttachment(activeRoomId, file);
+                }
+                event.target.value = "";
+              }}
+            />
             <button
               type="button"
-              className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 text-[var(--text-2)] transition-all duration-200 hover:bg-white/10"
-              aria-label="Anexar"
+              disabled={!activeRoomId || connectionStatus !== "connected"}
+              onClick={() => document.getElementById(messageFileInputId)?.click()}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/15 text-[var(--text-2)] transition hover:bg-white/10 hover:text-[var(--text-0)] disabled:opacity-50"
+              aria-label="Anexar imagem"
+              title="Anexar imagem"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M21.44 11.05l-8.49 8.49a5 5 0 01-7.07-7.07l9.19-9.19a3.5 3.5 0 114.95 4.95L9.77 18.48a2 2 0 01-2.83-2.83l8.49-8.49" />
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
               </svg>
             </button>
             <input
               value={activeRoomId ? draftByRoom[activeRoomId] ?? "" : ""}
+              maxLength={MAX_MESSAGE_CONTENT_LENGTH}
               onChange={(e) => activeRoomId && setDraft(activeRoomId, e.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && activeRoomId) {
+                if (event.key === "Enter" && !event.shiftKey && activeRoomId) {
                   event.preventDefault();
-                  sendMessage(activeRoomId);
+                  void sendComposer(activeRoomId);
                 }
               }}
-              className="h-11 w-full rounded-xl border border-white/15 bg-[#1a1b20] px-3 text-base text-[var(--text-0)] outline-none transition focus:border-[var(--primary-400)]"
+              disabled={!activeRoomId || connectionStatus !== "connected"}
+              className="h-11 min-w-0 flex-1 rounded-xl border border-white/15 bg-[var(--bg-1)] px-3 text-base text-[var(--text-0)] outline-none transition focus:border-[var(--primary-400)] disabled:opacity-50"
               placeholder={
-                activeRoom?.zero_logging ? "Enviar mensagem (não será salva)" : "Enviar mensagem"
+                !activeRoom
+                  ? "Selecione uma sala"
+                  : activeRoomId && pendingAttachmentByRoom[activeRoomId]
+                    ? "Legenda (opcional)…"
+                    : activeRoom.zero_logging
+                      ? "Mensagem ao vivo — não será salva"
+                      : "Escreva uma mensagem…"
               }
               aria-label="Mensagem"
             />
             <button
               type="button"
-              className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 text-[var(--text-2)] transition-all duration-200 hover:bg-white/10"
-              aria-label="Áudio"
+              onClick={() => activeRoomId && void sendComposer(activeRoomId)}
+              disabled={
+                !activeRoomId ||
+                connectionStatus !== "connected" ||
+                (!pendingAttachmentByRoom[activeRoomId ?? ""] &&
+                  !(draftByRoom[activeRoomId ?? ""] ?? "").trim())
+              }
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[var(--primary-500)] text-white transition hover:bg-[var(--primary-400)] disabled:cursor-not-allowed disabled:bg-[var(--bg-2)] disabled:text-[var(--text-3)]"
+              aria-label="Enviar mensagem"
             >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <rect x="9" y="3" width="6" height="12" rx="3" />
-                <path d="M5 11a7 7 0 0014 0M12 18v3M8 21h8" />
-              </svg>
-            </button>
-            <button
-              onClick={() => activeRoomId && sendMessage(activeRoomId)}
-              disabled={!activeRoomId}
-              className="grid h-11 w-11 place-items-center rounded-xl bg-[#1f2128] text-[var(--text-1)] transition-all duration-200 hover:brightness-110 disabled:opacity-60"
-              aria-label="Enviar"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 fill-current">
                 <path d="M3.4 20.4l17.8-8.4c.9-.4.9-1.6 0-2L3.4 1.6c-.8-.4-1.7.4-1.4 1.3l2.1 6.4c.1.4.5.7.9.7h7.7a1 1 0 110 2H5a1 1 0 00-.9.7L2 19.1c-.3.9.6 1.7 1.4 1.3z" />
               </svg>
             </button>
@@ -769,16 +1019,14 @@ export function ChatShell() {
         </footer>
       </main>
 
+      {isRightPanelOpen ? (
       <aside
-        className={`border-l border-white/8 bg-[#0c0d12] p-4 ${
-          isRightPanelOpen
-            ? mobileView === "info"
-              ? "block"
-              : "hidden lg:block"
-            : "hidden"
-        }`}
+        className={cn(
+          "flex min-h-0 min-w-0 flex-col border-l border-white/8 bg-[var(--bg-0)]",
+          mobileView === "info" ? "flex" : "hidden lg:flex",
+        )}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/8 px-4 py-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -790,98 +1038,204 @@ export function ChatShell() {
                 <path d="M15 18l-6-6 6-6" />
               </svg>
             </button>
-            <h2 className="text-lg font-semibold text-[var(--text-1)]">Info da Sala</h2>
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold text-[var(--text-0)]">
+                {activeRoom?.name ?? "Sala"}
+              </h2>
+              {activeRoom ? (
+                <p
+                  className={`truncate text-xs ${
+                    activeRoom.type === "PUBLIC"
+                      ? "text-[var(--success-500)]"
+                      : activeRoom.type === "TEMPORARY"
+                        ? "text-[var(--warning-500)]"
+                        : activeRoom.type === "PRIVATE"
+                          ? "text-cyan-400/80"
+                          : "text-[var(--text-3)]"
+                  }`}
+                >
+                  {formatRoomType(activeRoom.type)}
+                  {activeRoom.zero_logging ? (
+                    <span className="text-[var(--primary-300)]"> · Zero logging</span>
+                  ) : null}
+                </p>
+              ) : (
+                <p className="text-xs text-[var(--text-3)]">Selecione uma sala</p>
+              )}
+            </div>
           </div>
-          <button type="button" className="text-sm text-[var(--text-3)]" onClick={closeRoomInfoPanel}>
+          <button
+            type="button"
+            className="rounded-md p-1 text-sm text-[var(--text-3)] transition hover:bg-white/10 hover:text-[var(--text-1)]"
+            onClick={closeRoomInfoPanel}
+            aria-label="Fechar painel"
+          >
             ✕
           </button>
         </div>
-        {activeRoom ? (
-          <>
-            <p className="text-xl text-[var(--text-1)]">{activeRoom.name}</p>
-            <div className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-wide">
-              <span
-                className={`rounded px-1.5 py-0.5 ${
-                  activeRoom.type === "PRIVATE"
-                    ? "bg-fuchsia-500/20 text-fuchsia-300"
-                    : activeRoom.type === "PUBLIC"
-                      ? "bg-emerald-500/20 text-emerald-300"
-                      : "bg-amber-500/20 text-amber-300"
-                }`}
-              >
-                {activeRoom.type}
-              </span>
-              {activeRoom.zero_logging ? (
-                <span className="rounded bg-[#7a00ff]/20 px-1.5 py-0.5 text-[#d3b3ff]">ZERO</span>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {activeRoom ? (
+            <div className="space-y-4">
+              {token ? (
+                <RoomMediaEditor
+                  room={activeRoom}
+                  token={token}
+                  canEdit={canAddMembers}
+                  onMediaUpdated={(patch) => patchRoomMedia(activeRoom.room_id, patch)}
+                />
               ) : null}
-            </div>
-            {activeRoom.description ? (
-              <p className="mt-2 text-sm text-[var(--text-2)]">{activeRoom.description}</p>
-            ) : null}
+              <div className="rounded-xl border border-white/10 bg-[var(--bg-1)] px-4 py-3 text-center">
+                <RoomTypeBadge
+                  type={activeRoom.type}
+                  zeroLogging={activeRoom.zero_logging}
+                />
+                {activeRoom.description ? (
+                  <p className="mt-3 text-sm leading-relaxed text-[var(--text-2)]">
+                    {activeRoom.description}
+                  </p>
+                ) : (
+                  <p className="mt-3 text-sm italic text-[var(--text-3)]">Sem descrição</p>
+                )}
+              </div>
 
-            <div className="mt-6">
-              <h3 className="text-sm font-medium text-[var(--text-1)]">
-                Participantes ({roomMembers.length})
-              </h3>
-              <ul className="mt-2 space-y-2">
-                {roomMembers.map((member) => (
-                  <li key={member.user_id} className="rounded-lg bg-[#15161c] px-3 py-2">
-                    <p className="text-sm text-[var(--text-1)]">{member.handle}</p>
-                    <p className="text-xs text-[var(--text-3)]">{member.role}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="mt-6 rounded-xl border border-white/10 bg-[#13141a] p-3">
-              <p className="text-sm text-[var(--text-1)]">Adicionar participante</p>
-              {canAddMembers ? (
-                <>
-                  <p className="mt-1 text-xs text-[var(--text-3)]">Digite o handle do usuário (ex: joao#1234)</p>
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      value={memberHandleInput}
-                      onChange={(event) => setMemberHandleInput(event.target.value)}
-                      placeholder="usuario#1234"
-                      className="w-full rounded-lg border border-white/15 bg-[#1a1b20] px-3 py-2 text-sm text-[var(--text-0)] outline-none focus:border-[var(--primary-400)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void handleAddMember()}
-                      className="rounded-lg border border-white/15 px-3 py-2 text-sm text-[var(--text-2)] transition-all duration-200 hover:bg-white/10"
-                    >
-                      Adicionar
-                    </button>
-                  </div>
-                  {addMemberFeedback ? (
-                    <p className="mt-2 text-xs text-[var(--text-3)]">{addMemberFeedback}</p>
-                  ) : null}
-                </>
-              ) : (
-                <p className="mt-1 text-xs text-[var(--text-3)]">
-                  Somente admins podem adicionar usuários. Seu papel nesta sala: {myMembership?.role ?? "desconhecido"}.
+              <div className="rounded-xl border border-white/10 bg-[var(--bg-1)] px-3 py-1">
+                <p className="border-b border-white/8 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-3)]">
+                  Detalhes
                 </p>
-              )}
-            </div>
+                <MetaRow label="Tipo" value={formatRoomType(activeRoom.type)} />
+                <MetaRow
+                  label="Criada em"
+                  value={formatDateTime(activeRoom.created_at)}
+                />
+                <MetaRow
+                  label="Participantes"
+                  value={String(roomMembers.length)}
+                />
+                <MetaRow
+                  label="Mensagens visíveis"
+                  value={String(visibleRoomMessages.length)}
+                />
+                {myMembership ? (
+                  <MetaRow label="Seu papel" value={formatRole(myMembership.role)} />
+                ) : null}
+                {activeRoom.type === "TEMPORARY" ? (
+                  <>
+                    <MetaRow label="TTL" value={`${activeRoom.ttl}s`} />
+                    {activeRoomExpiresInSeconds !== null ? (
+                      <MetaRow
+                        label="Expira em"
+                        value={formatCountdown(activeRoomExpiresInSeconds)}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+                {activeRoom.zero_logging ? (
+                  <MetaRow label="Histórico" value="Não persiste (zero logging)" />
+                ) : (
+                  <MetaRow label="Histórico" value="Persistido no servidor" />
+                )}
+              </div>
 
-            <div className="mt-6 rounded-xl border border-white/10 bg-[#13141a] p-3">
-              <p className="text-sm text-[var(--text-2)]">Conectado como</p>
-              <p className="text-base text-[var(--text-0)]">{user.handle}</p>
-              <button
-                type="button"
-                onClick={() => logout().then(() => disconnect())}
-                className="mt-3 w-full rounded-lg border border-white/15 px-3 py-2 text-sm text-[var(--text-2)]"
-              >
-                Sair da sessão
-              </button>
+              {activeRoom.type === "PUBLIC" ? (
+                <div className="rounded-xl border border-[var(--success-500)]/20 bg-[var(--bg-1)] p-3">
+                  <div className="flex items-center gap-2">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4 text-[var(--success-500)]"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+                    </svg>
+                    <p className="text-sm font-medium text-[var(--text-0)]">Link de entrada</p>
+                  </div>
+                  <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-3)]">
+                    Salas públicas podem ser acessadas por ID. Compartilhe o UUID abaixo.
+                  </p>
+                  <p className="mt-2 rounded-lg border border-white/10 bg-[var(--bg-0)] px-2.5 py-2 font-mono text-[11px] leading-relaxed text-[var(--text-2)] break-all">
+                    {activeRoom.room_id}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyRoomId()}
+                    className="mt-2 w-full rounded-lg border border-[var(--success-500)]/35 bg-[var(--success-500)]/10 px-3 py-2 text-sm font-medium text-[var(--success-500)] transition hover:bg-[var(--success-500)]/18"
+                  >
+                    Copiar ID da sala
+                  </button>
+                  {roomIdCopyFeedback ? (
+                    <p className="mt-2 text-center text-xs text-[var(--success-500)]">
+                      {roomIdCopyFeedback}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div>
+                <h3 className="text-sm font-medium text-[var(--text-1)]">
+                  Participantes
+                  <span className="ml-1.5 font-normal text-[var(--text-3)]">({roomMembers.length})</span>
+                </h3>
+                <ul className="mt-2 space-y-2">
+                  {roomMembers.map((member) => (
+                    <ParticipantRow
+                      key={member.user_id}
+                      member={member}
+                      isSelf={member.user_id === user.userId}
+                      token={token}
+                    />
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-[var(--bg-1)] p-3">
+                <p className="text-sm font-medium text-[var(--text-1)]">Adicionar participante</p>
+                {canAddMembers ? (
+                  <>
+                    <p className="mt-1 text-xs text-[var(--text-3)]">
+                      Convide por handle (ex: joao#1234)
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        value={memberHandleInput}
+                        onChange={(event) => setMemberHandleInput(event.target.value)}
+                        placeholder="usuario#1234"
+                        className="min-w-0 flex-1 rounded-lg border border-white/15 bg-[var(--bg-0)] px-3 py-2 text-sm text-[var(--text-0)] outline-none focus:border-[var(--primary-400)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleAddMember()}
+                        disabled={!memberHandleInput.trim()}
+                        className="shrink-0 rounded-lg bg-[var(--primary-500)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[var(--primary-400)] disabled:cursor-not-allowed disabled:bg-[var(--bg-2)] disabled:text-[var(--text-3)]"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                    {addMemberFeedback ? (
+                      <p className="mt-2 text-xs text-[var(--text-3)]">{addMemberFeedback}</p>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="mt-2 text-xs leading-relaxed text-[var(--text-3)]">
+                    Apenas administradores podem convidar. Seu papel:{" "}
+                    <span className="text-[var(--text-2)]">
+                      {myMembership ? formatRole(myMembership.role) : "não membro"}
+                    </span>
+                    .
+                  </p>
+                )}
+              </div>
             </div>
-          </>
-        ) : (
-          <p className="text-sm text-[var(--text-3)]">
-            Selecione uma sala para visualizar detalhes e participantes.
-          </p>
-        )}
+          ) : (
+            <p className="mt-4 rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-[var(--text-3)]">
+              Selecione uma sala para ver detalhes, participantes e o link de entrada.
+            </p>
+          )}
+        </div>
       </aside>
+      ) : null}
     </div>
   );
 }

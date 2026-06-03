@@ -15,6 +15,7 @@ import (
 type RoomHandler struct {
 	rooms           contracts.RoomRepository
 	memberships     contracts.RoomMembershipRepository
+	storage         contracts.ObjectStorage
 	validateSession *auth.ValidateSessionUseCase
 }
 
@@ -22,10 +23,12 @@ func NewRoomHandler(
 	rooms contracts.RoomRepository,
 	memberships contracts.RoomMembershipRepository,
 	sessions contracts.SessionRepository,
+	storage contracts.ObjectStorage,
 ) *RoomHandler {
 	return &RoomHandler{
 		rooms:           rooms,
 		memberships:     memberships,
+		storage:         storage,
 		validateSession: auth.NewValidateSessionUseCase(sessions),
 	}
 }
@@ -164,6 +167,8 @@ func (h *RoomHandler) ListRooms(w http.ResponseWriter, r *http.Request) {
 		TTL          int        `json:"ttl"`
 		ParanoidMode bool       `json:"paranoid_mode"`
 		ZeroLogging  bool       `json:"zero_logging"`
+		AvatarObjectKey string `json:"avatar_object_key,omitempty"`
+		BannerObjectKey string `json:"banner_object_key,omitempty"`
 		CreatedAt    time.Time  `json:"created_at"`
 		ExpiresAt    *time.Time `json:"expires_at,omitempty"`
 	}
@@ -178,6 +183,8 @@ func (h *RoomHandler) ListRooms(w http.ResponseWriter, r *http.Request) {
 			TTL:          room.TTL,
 			ParanoidMode: room.ParanoidMode,
 			ZeroLogging:  room.ZeroLogging,
+			AvatarObjectKey: room.AvatarObjectKey,
+			BannerObjectKey: room.BannerObjectKey,
 			CreatedAt:    room.CreatedAt,
 			ExpiresAt:    room.ExpiresAt,
 		}
@@ -228,17 +235,19 @@ func (h *RoomHandler) ListRoomMembers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type memberItem struct {
-		UserID string `json:"user_id"`
-		Handle string `json:"handle"`
-		Role   string `json:"role"`
+		UserID          string `json:"user_id"`
+		Handle          string `json:"handle"`
+		Role            string `json:"role"`
+		AvatarObjectKey string `json:"avatar_object_key,omitempty"`
 	}
 
 	items := make([]memberItem, 0, len(members))
 	for _, m := range members {
 		items = append(items, memberItem{
-			UserID: m.UserID.String(),
-			Handle: m.Handle,
-			Role:   string(m.Role),
+			UserID:          m.UserID.String(),
+			Handle:          m.Handle,
+			Role:            string(m.Role),
+			AvatarObjectKey: m.AvatarObjectKey,
 		})
 	}
 

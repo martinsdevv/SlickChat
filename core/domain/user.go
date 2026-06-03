@@ -21,6 +21,7 @@ type User struct {
 	PasswordHash    string
 	RecoveryKeyHash string
 	ParanoidMode    bool
+	AvatarObjectKey string
 	CreatedAt       time.Time
 }
 

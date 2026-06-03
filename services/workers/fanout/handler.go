@@ -34,7 +34,11 @@ type MessageReadWithCount struct {
 	ReadCount int `json:"read_count"`
 }
 
-func FanoutHandler(rdb *redis.Client, memberships contracts.RoomMembershipRepository) func(events.Event) {
+func FanoutHandler(
+	rdb *redis.Client,
+	memberships contracts.RoomMembershipRepository,
+	storage contracts.ObjectStorage,
+) func(events.Event) {
 	return func(event events.Event) {
 		switch event.EventType {
 
@@ -48,10 +52,10 @@ func FanoutHandler(rdb *redis.Client, memberships contracts.RoomMembershipReposi
 			handleMessageRead(event, rdb)
 
 		case events.EventTypeMessageDeleted:
-			handleMessageDeleted(event, rdb, memberships)
+			handleMessageDeleted(event, rdb, memberships, storage)
 
 		case events.EventTypeMessageExpired:
-			handleMessageExpired(event, rdb, memberships)
+			handleMessageExpired(event, rdb, memberships, storage)
 
 		case events.EventTypeUserJoinedRoom:
 			handleUserJoinedRoom(event, rdb)
@@ -297,7 +301,23 @@ func isUserInRoom(rdb *redis.Client, userID, roomID string) bool {
 	return exists
 }
 
-func handleMessageDeleted(event events.Event, rdb *redis.Client, memberships contracts.RoomMembershipRepository) {
+func purgeMessageObject(ctx context.Context, rdb *redis.Client, storage contracts.ObjectStorage, messageID string) {
+	if storage == nil {
+		return
+	}
+	objectKey, err := rdb.HGet(ctx, "message:"+messageID, "attachment_object_key").Result()
+	if err != nil || objectKey == "" {
+		return
+	}
+	_ = storage.Delete(ctx, objectKey)
+}
+
+func handleMessageDeleted(
+	event events.Event,
+	rdb *redis.Client,
+	memberships contracts.RoomMembershipRepository,
+	storage contracts.ObjectStorage,
+) {
 	ctx := context.Background()
 
 	var payload events.MessageDeleted
@@ -327,10 +347,16 @@ func handleMessageDeleted(event events.Event, rdb *redis.Client, memberships con
 		}
 	}
 
+	purgeMessageObject(ctx, rdb, storage, payload.MessageID)
 	rdb.Del(ctx, "message:"+payload.MessageID)
 }
 
-func handleMessageExpired(event events.Event, rdb *redis.Client, memberships contracts.RoomMembershipRepository) {
+func handleMessageExpired(
+	event events.Event,
+	rdb *redis.Client,
+	memberships contracts.RoomMembershipRepository,
+	storage contracts.ObjectStorage,
+) {
 	ctx := context.Background()
 
 	var payload events.MessageExpired
@@ -360,6 +386,7 @@ func handleMessageExpired(event events.Event, rdb *redis.Client, memberships con
 		}
 	}
 
+	purgeMessageObject(ctx, rdb, storage, payload.MessageID)
 	rdb.Del(ctx, "message:"+payload.MessageID)
 }
 

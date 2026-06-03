@@ -11,12 +11,13 @@ const (
 )
 
 type MessageSent struct {
-	MessageID        string     `json:"message_id"`
-	RoomID           string     `json:"room_id"`
-	SenderID         string     `json:"sender_id"`
-	MessageType      string     `json:"message_type"`
-	Content          string     `json:"content"`
-	IsZeroLogging    bool       `json:"is_zero_logging"`
+	MessageID           string     `json:"message_id"`
+	RoomID              string     `json:"room_id"`
+	SenderID            string     `json:"sender_id"`
+	MessageType         string     `json:"message_type"`
+	Content             string     `json:"content"`
+	AttachmentObjectKey string     `json:"attachment_object_key,omitempty"`
+	IsZeroLogging       bool       `json:"is_zero_logging"`
 	TTL              int        `json:"ttl"`
 	DestroyAfterRead bool       `json:"destroy_after_read"`
 	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
